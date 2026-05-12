@@ -28,8 +28,14 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.preprocessing import Normalizer
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    confusion_matrix, classification_report, roc_auc_score, roc_curve
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report,
+    roc_auc_score,
+    roc_curve,
 )
 from sklearn.cluster import KMeans
 from imblearn.under_sampling import RandomUnderSampler
@@ -40,8 +46,8 @@ from torch.utils.data import DataLoader, TensorDataset
 import time
 import copy
 
-sns.set_theme(style='whitegrid', context='notebook')
-plt.rcParams['figure.figsize'] = (10, 6)
+sns.set_theme(style="whitegrid", context="notebook")
+plt.rcParams["figure.figsize"] = (10, 6)
 
 # Reproducibilidad
 SEED = 42
@@ -50,9 +56,9 @@ torch.manual_seed(SEED)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(SEED)
 
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f'Dispositivo: {DEVICE}')
-print(f'PyTorch version: {torch.__version__}')
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Dispositivo: {DEVICE}")
+print(f"PyTorch version: {torch.__version__}")
 
 # %% [markdown]
 # ## 2. Carga y Preprocesamiento (Pipeline heredado de CD)
@@ -63,32 +69,37 @@ print(f'PyTorch version: {torch.__version__}')
 
 # %%
 # --- Carga del dataset ---
-df = pd.read_csv('i40.csv')
-print(f'Dimensiones originales: {df.shape}')
+df = pd.read_csv("i40.csv")
+print(f"Dimensiones originales: {df.shape}")
 
 # --- 2.1 Limpieza inicial ---
 df_prep = df.copy()
-target_col = 'target'
-id_cols = ['idx', 'parent_device_id']
+target_col = "target"
+id_cols = ["idx", "parent_device_id"]
 
 df_prep = df_prep.drop(columns=[c for c in id_cols if c in df_prep.columns])
 
 # Variables numéricas y categóricas
-num_cols = [c for c in df_prep.select_dtypes(include=np.number).columns if c != target_col]
-cat_cols = [c for c in df_prep.select_dtypes(exclude=np.number).columns if c != target_col]
-print(f'Numéricas: {num_cols}')
-print(f'Categóricas: {cat_cols}')
+num_cols = [
+    c for c in df_prep.select_dtypes(include=np.number).columns if c != target_col
+]
+cat_cols = [
+    c for c in df_prep.select_dtypes(exclude=np.number).columns if c != target_col
+]
+print(f"Numéricas: {num_cols}")
+print(f"Categóricas: {cat_cols}")
 
 # Duplicados
 dup_count = int(df_prep.duplicated().sum())
-print(f'Duplicados eliminados: {dup_count}')
+print(f"Duplicados eliminados: {dup_count}")
 df_prep = df_prep.drop_duplicates().reset_index(drop=True)
 
 # Valores erróneos: RPM <= 0
-if 'speed [RPM]' in df_prep.columns:
-    wrong_rpm = (df_prep['speed [RPM]'] <= 0).sum()
-    print(f'Registros con RPM <= 0: {int(wrong_rpm)}')
-    df_prep.loc[df_prep['speed [RPM]'] <= 0, 'speed [RPM]'] = np.nan
+if "speed [RPM]" in df_prep.columns:
+    wrong_rpm = (df_prep["speed [RPM]"] <= 0).sum()
+    print(f"Registros con RPM <= 0: {int(wrong_rpm)}")
+    df_prep.loc[df_prep["speed [RPM]"] <= 0, "speed [RPM]"] = np.nan
+
 
 # --- 2.2 Imputación con KMeans para pares correlacionados ---
 def impute_with_kmeans(df, target_col, predictor_col, n_clusters=5):
@@ -111,13 +122,14 @@ def impute_with_kmeans(df, target_col, predictor_col, n_clusters=5):
         df.at[idx, target_col] = centroids[nearest, 1]
     return df
 
+
 # Speed vs Torque (corr ~ -0.89)
-if 'speed [RPM]' in df_prep.columns and 'torque [Nm]' in df_prep.columns:
-    df_prep = impute_with_kmeans(df_prep, 'speed [RPM]', 'torque [Nm]')
+if "speed [RPM]" in df_prep.columns and "torque [Nm]" in df_prep.columns:
+    df_prep = impute_with_kmeans(df_prep, "speed [RPM]", "torque [Nm]")
 
 # Air temp vs Process temp (corr ~ 0.86)
-if 'air_temp [K]' in df_prep.columns and 'process_temp [K]' in df_prep.columns:
-    df_prep = impute_with_kmeans(df_prep, 'air_temp [K]', 'process_temp [K]')
+if "air_temp [K]" in df_prep.columns and "process_temp [K]" in df_prep.columns:
+    df_prep = impute_with_kmeans(df_prep, "air_temp [K]", "process_temp [K]")
 
 # Imputación de restantes (median/moda)
 for c in num_cols:
@@ -127,7 +139,7 @@ for c in cat_cols:
     if not moda.empty:
         df_prep[c] = df_prep[c].fillna(moda.iloc[0])
 
-print(f'Nulos después de imputar: {df_prep.isnull().sum().sum()}')
+print(f"Nulos después de imputar: {df_prep.isnull().sum().sum()}")
 
 # --- 2.3 Tratamiento de outliers ---
 for c in num_cols:
@@ -136,14 +148,14 @@ for c in num_cols:
     iqr = q3 - q1
     lower = q1 - 1.5 * iqr
     upper = q3 + 1.5 * iqr
-    if c == 'speed [RPM]':
+    if c == "speed [RPM]":
         # Transformación logarítmica: preserva información de regímenes extremos
         df_prep[c] = np.log1p(df_prep[c])
     else:
         # Clipping IQR para el resto
         df_prep[c] = df_prep[c].clip(lower=lower, upper=upper)
 
-print(f'Columnas numéricas después del tratamiento: {num_cols}')
+print(f"Columnas numéricas después del tratamiento: {num_cols}")
 
 # --- 2.4 Codificación de categóricas y balanceo ---
 y = df_prep[target_col].copy()
@@ -153,16 +165,16 @@ X = df_prep.drop(columns=[target_col]).copy()
 X_encoded = pd.get_dummies(X, columns=cat_cols, drop_first=True)
 
 # Target binario: failure=1, normal=0
-y_bin = y.map({'failure': 1, 'normal': 0})
+y_bin = y.map({"failure": 1, "normal": 0})
 
-print(f'Shape X codificada: {X_encoded.shape}')
-print(f'Distribución original: failure={y_bin.sum()}, normal={(y_bin==0).sum()}')
+print(f"Shape X codificada: {X_encoded.shape}")
+print(f"Distribución original: failure={y_bin.sum()}, normal={(y_bin==0).sum()}")
 
 # Undersampling: balance 50/50 sin generar datos sintéticos
 undersampler = RandomUnderSampler(random_state=SEED)
 X_bal, y_bal = undersampler.fit_resample(X_encoded, y_bin)
 
-print(f'Distribución balanceada: 0={(y_bal==0).sum()}, 1={y_bal.sum()}')
+print(f"Distribución balanceada: 0={(y_bal==0).sum()}, 1={y_bal.sum()}")
 
 # --- 2.5 Normalización ---
 scaler = Normalizer()
@@ -170,18 +182,18 @@ num_cols_encoded = [c for c in num_cols if c in X_bal.columns]
 X_scaled = X_bal.copy()
 X_scaled[num_cols_encoded] = scaler.fit_transform(X_scaled[num_cols_encoded])
 
-print(f'Shape final X_scaled: {X_scaled.shape}')
-print(f'Columnas finales: {list(X_scaled.columns)}')
+print(f"Shape final X_scaled: {X_scaled.shape}")
+print(f"Columnas finales: {list(X_scaled.columns)}")
 
 # --- 2.6 División train/test (IDÉNTICA a CD) ---
 X_train, X_test, y_train, y_test = train_test_split(
     X_scaled, y_bal, test_size=0.30, random_state=SEED, stratify=y_bal
 )
 
-print(f'\nTrain: X={X_train.shape}, y={y_train.shape}')
-print(f'Test:  X={X_test.shape}, y={y_test.shape}')
-print(f'Distribución train: 0={int((y_train==0).sum())}, 1={int(y_train.sum())}')
-print(f'Distribución test:  0={int((y_test==0).sum())}, 1={int(y_test.sum())}')
+print(f"\nTrain: X={X_train.shape}, y={y_train.shape}")
+print(f"Test:  X={X_test.shape}, y={y_test.shape}")
+print(f"Distribución train: 0={int((y_train==0).sum())}, 1={int(y_train.sum())}")
+print(f"Distribución test:  0={int((y_test==0).sum())}, 1={int(y_test.sum())}")
 
 # Convertir a tensores PyTorch
 X_train_t = torch.FloatTensor(X_train.values)
@@ -190,7 +202,7 @@ X_test_t = torch.FloatTensor(X_test.values)
 y_test_t = torch.FloatTensor(y_test.values).unsqueeze(1)
 
 INPUT_DIM = X_train_t.shape[1]
-print(f'\nDimensión de entrada (features): {INPUT_DIM}')
+print(f"\nDimensión de entrada (features): {INPUT_DIM}")
 
 # %% [markdown]
 # ## 3. Diseño de la Red Neuronal MLP
@@ -226,6 +238,7 @@ print(f'\nDimensión de entrada (features): {INPUT_DIM}')
 # 8. **Optimizador Adam:** Combina las ventajas de RMSProp y Momentum, con tasas
 #    de aprendizaje adaptativas por parámetro.
 
+
 # %%
 class MaintenanceMLP(nn.Module):
     """
@@ -233,6 +246,7 @@ class MaintenanceMLP(nn.Module):
     Arquitectura: Input → [64] → [32] → [16] → Output
     Cada capa oculta: Linear → BatchNorm → ReLU → Dropout
     """
+
     def __init__(self, input_dim, hidden_layers, dropout_rate=0.4):
         """
         Args:
@@ -264,7 +278,9 @@ class MaintenanceMLP(nn.Module):
 # Instanciar modelo base para verificar arquitectura
 model_base = MaintenanceMLP(INPUT_DIM, [64, 32, 16], dropout_rate=0.4)
 print(model_base)
-print(f'\nParámetros entrenables: {sum(p.numel() for p in model_base.parameters() if p.requires_grad):,}')
+print(
+    f"\nParámetros entrenables: {sum(p.numel() for p in model_base.parameters() if p.requires_grad):,}"
+)
 
 # %% [markdown]
 # ## 4. Función de Entrenamiento con Early Stopping
@@ -274,9 +290,19 @@ print(f'\nParámetros entrenables: {sum(p.numel() for p in model_base.parameters
 #   durante `patience` épocas consecutivas, restaurando los mejores pesos.
 # - **Registro de métricas:** loss y accuracy por época para graficar curvas de aprendizaje.
 
+
 # %%
-def train_model(model, train_loader, val_loader, criterion, optimizer,
-                epochs=200, patience=20, device=DEVICE, verbose=True):
+def train_model(
+    model,
+    train_loader,
+    val_loader,
+    criterion,
+    optimizer,
+    epochs=200,
+    patience=20,
+    device=DEVICE,
+    verbose=True,
+):
     """
     Entrena un modelo PyTorch con early stopping.
 
@@ -287,10 +313,10 @@ def train_model(model, train_loader, val_loader, criterion, optimizer,
         train_time: tiempo total de entrenamiento en segundos
     """
     model = model.to(device)
-    best_loss = float('inf')
+    best_loss = float("inf")
     best_model_wts = copy.deepcopy(model.state_dict())
     patience_counter = 0
-    history = {'train_loss': [], 'val_loss': [], 'train_acc': [], 'val_acc': []}
+    history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
 
     start_time = time.time()
 
@@ -338,10 +364,10 @@ def train_model(model, train_loader, val_loader, criterion, optimizer,
         val_acc = val_correct / val_total
 
         # Registrar métricas
-        history['train_loss'].append(avg_train_loss)
-        history['val_loss'].append(avg_val_loss)
-        history['train_acc'].append(train_acc)
-        history['val_acc'].append(val_acc)
+        history["train_loss"].append(avg_train_loss)
+        history["val_loss"].append(avg_val_loss)
+        history["train_acc"].append(train_acc)
+        history["val_acc"].append(val_acc)
 
         # Early stopping
         if avg_val_loss < best_loss:
@@ -353,13 +379,15 @@ def train_model(model, train_loader, val_loader, criterion, optimizer,
             patience_counter += 1
 
         if verbose and (epoch + 1) % 20 == 0:
-            print(f'Época {epoch+1:3d}/{epochs} | '
-                  f'Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | '
-                  f'Train Acc: {train_acc:.3f} | Val Acc: {val_acc:.3f}')
+            print(
+                f"Época {epoch+1:3d}/{epochs} | "
+                f"Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | "
+                f"Train Acc: {train_acc:.3f} | Val Acc: {val_acc:.3f}"
+            )
 
         if patience_counter >= patience:
             if verbose:
-                print(f'\nEarly stopping en época {epoch+1}. Mejor época: {best_epoch}')
+                print(f"\nEarly stopping en época {epoch+1}. Mejor época: {best_epoch}")
             break
 
     train_time = time.time() - start_time
@@ -385,13 +413,14 @@ def evaluate_model(model, X_test, y_test, device=DEVICE):
     y_true = y_test.numpy().flatten()
 
     metrics = {
-        'accuracy':  accuracy_score(y_true, y_pred),
-        'precision': precision_score(y_true, y_pred),
-        'recall':    recall_score(y_true, y_pred),
-        'f1':        f1_score(y_true, y_pred),
-        'auc':       roc_auc_score(y_true, y_proba)
+        "accuracy": accuracy_score(y_true, y_pred),
+        "precision": precision_score(y_true, y_pred),
+        "recall": recall_score(y_true, y_pred),
+        "f1": f1_score(y_true, y_pred),
+        "auc": roc_auc_score(y_true, y_proba),
     }
     return y_pred, y_proba, metrics
+
 
 # %% [markdown]
 # ## 5. Ajuste de Hiperparámetros
@@ -421,8 +450,8 @@ y_tune_t = torch.FloatTensor(y_tune).unsqueeze(1)
 X_val_t = torch.FloatTensor(X_val)
 y_val_t = torch.FloatTensor(y_val).unsqueeze(1)
 
-print(f'Tune:  X={X_tune.shape}, y={y_tune.shape}')
-print(f'Val:   X={X_val.shape}, y={y_val.shape}')
+print(f"Tune:  X={X_tune.shape}, y={y_tune.shape}")
+print(f"Val:   X={X_val.shape}, y={y_val.shape}")
 
 # %% [markdown]
 # ### 5.1 Exploración de arquitecturas y tasas de aprendizaje
@@ -442,9 +471,9 @@ PATIENCE = 15
 
 # Combinaciones a explorar
 architectures = [
-    ([32, 16],    '2 capas [32,16]'),
-    ([64, 32],    '2 capas [64,32]'),
-    ([64, 32, 16], '3 capas [64,32,16]'),
+    ([32, 16], "2 capas [32,16]"),
+    ([64, 32], "2 capas [64,32]"),
+    ([64, 32, 16], "3 capas [64,32,16]"),
 ]
 
 learning_rates = [0.01, 0.001, 0.0005]
@@ -452,14 +481,14 @@ dropouts = [0.3, 0.5]
 
 results_tuning = []
 
-print('=' * 80)
-print('EXPLORACIÓN DE HIPERPARÁMETROS')
-print('=' * 80)
+print("=" * 80)
+print("EXPLORACIÓN DE HIPERPARÁMETROS")
+print("=" * 80)
 
 for arch, arch_name in architectures:
     for lr in learning_rates:
         for drop in dropouts:
-            print(f'\n--- {arch_name} | lr={lr} | dropout={drop} ---')
+            print(f"\n--- {arch_name} | lr={lr} | dropout={drop} ---")
 
             # DataLoaders
             tune_dataset = TensorDataset(X_tune_t, y_tune_t)
@@ -473,50 +502,71 @@ for arch, arch_name in architectures:
 
             # Entrenar
             model, history, best_ep, train_time = train_model(
-                model, tune_loader, val_loader, criterion, optimizer,
-                epochs=EPOCHS, patience=PATIENCE, verbose=False
+                model,
+                tune_loader,
+                val_loader,
+                criterion,
+                optimizer,
+                epochs=EPOCHS,
+                patience=PATIENCE,
+                verbose=False,
             )
 
             # Evaluar en validación
             _, _, val_metrics = evaluate_model(model, X_val_t, y_val_t)
 
-            results_tuning.append({
-                'architecture': arch_name,
-                'hidden_layers': arch,
-                'learning_rate': lr,
-                'dropout': drop,
-                'val_f1': val_metrics['f1'],
-                'val_auc': val_metrics['auc'],
-                'val_accuracy': val_metrics['accuracy'],
-                'best_epoch': best_ep,
-                'train_time': train_time,
-                'final_val_loss': history['val_loss'][-1]
-            })
+            results_tuning.append(
+                {
+                    "architecture": arch_name,
+                    "hidden_layers": arch,
+                    "learning_rate": lr,
+                    "dropout": drop,
+                    "val_f1": val_metrics["f1"],
+                    "val_auc": val_metrics["auc"],
+                    "val_accuracy": val_metrics["accuracy"],
+                    "best_epoch": best_ep,
+                    "train_time": train_time,
+                    "final_val_loss": history["val_loss"][-1],
+                }
+            )
 
-            print(f'  Val F1: {val_metrics["f1"]:.4f} | Val AUC: {val_metrics["auc"]:.4f} | '
-                  f'Best epoch: {best_ep} | Time: {train_time:.1f}s')
+            print(
+                f'  Val F1: {val_metrics["f1"]:.4f} | Val AUC: {val_metrics["auc"]:.4f} | '
+                f"Best epoch: {best_ep} | Time: {train_time:.1f}s"
+            )
 
 # %% [markdown]
 # ### 5.2 Resultados del tuning — Tabla comparativa
 
 # %%
 df_tuning = pd.DataFrame(results_tuning)
-df_tuning = df_tuning.sort_values('val_f1', ascending=False)
+df_tuning = df_tuning.sort_values("val_f1", ascending=False)
 display(df_tuning.round(4))
 
 # Visualizar top 5
 top5 = df_tuning.head(5)
 fig, ax = plt.subplots(figsize=(12, 5))
-bars = ax.bar(range(len(top5)), top5['val_f1'], color='steelblue')
+bars = ax.bar(range(len(top5)), top5["val_f1"], color="steelblue")
 ax.set_xticks(range(len(top5)))
-ax.set_xticklabels([f"{r['architecture']}\nlr={r['learning_rate']}, drop={r['dropout']}"
-                     for _, r in top5.iterrows()], fontsize=9)
-ax.set_ylabel('F1-Score (Validación)')
-ax.set_title('Top 5 configuraciones por F1 en validación')
-ax.set_ylim(top5['val_f1'].min() - 0.01, top5['val_f1'].max() + 0.01)
-for i, (bar, val) in enumerate(zip(bars, top5['val_f1'])):
-    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.001,
-            f'{val:.4f}', ha='center', va='bottom', fontweight='bold')
+ax.set_xticklabels(
+    [
+        f"{r['architecture']}\nlr={r['learning_rate']}, drop={r['dropout']}"
+        for _, r in top5.iterrows()
+    ],
+    fontsize=9,
+)
+ax.set_ylabel("F1-Score (Validación)")
+ax.set_title("Top 5 configuraciones por F1 en validación")
+ax.set_ylim(top5["val_f1"].min() - 0.01, top5["val_f1"].max() + 0.01)
+for i, (bar, val) in enumerate(zip(bars, top5["val_f1"])):
+    ax.text(
+        bar.get_x() + bar.get_width() / 2,
+        bar.get_height() + 0.001,
+        f"{val:.4f}",
+        ha="center",
+        va="bottom",
+        fontweight="bold",
+    )
 plt.tight_layout()
 plt.show()
 
@@ -531,7 +581,7 @@ arch_best = [64, 32, 16]
 drop_best = 0.4
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-colors = ['#e74c3c', '#2ecc71', '#3498db']
+colors = ["#e74c3c", "#2ecc71", "#3498db"]
 
 for i, lr in enumerate([0.01, 0.001, 0.0005]):
     model = MaintenanceMLP(INPUT_DIM, arch_best, dropout_rate=drop_best)
@@ -542,32 +592,42 @@ for i, lr in enumerate([0.01, 0.001, 0.0005]):
     val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
 
     model, history, _, _ = train_model(
-        model, tune_loader, val_loader, criterion, optimizer,
-        epochs=100, patience=20, verbose=False
+        model,
+        tune_loader,
+        val_loader,
+        criterion,
+        optimizer,
+        epochs=100,
+        patience=20,
+        verbose=False,
     )
 
-    axes[0].plot(history['train_loss'], color=colors[i], linestyle='--',
-                 label=f'lr={lr} (train)')
-    axes[0].plot(history['val_loss'], color=colors[i], linestyle='-',
-                 label=f'lr={lr} (val)')
-    axes[1].plot(history['train_acc'], color=colors[i], linestyle='--',
-                 label=f'lr={lr} (train)')
-    axes[1].plot(history['val_acc'], color=colors[i], linestyle='-',
-                 label=f'lr={lr} (val)')
+    axes[0].plot(
+        history["train_loss"], color=colors[i], linestyle="--", label=f"lr={lr} (train)"
+    )
+    axes[0].plot(
+        history["val_loss"], color=colors[i], linestyle="-", label=f"lr={lr} (val)"
+    )
+    axes[1].plot(
+        history["train_acc"], color=colors[i], linestyle="--", label=f"lr={lr} (train)"
+    )
+    axes[1].plot(
+        history["val_acc"], color=colors[i], linestyle="-", label=f"lr={lr} (val)"
+    )
 
-axes[0].set_xlabel('Época')
-axes[0].set_ylabel('Loss')
-axes[0].set_title('Curvas de pérdida según learning rate')
+axes[0].set_xlabel("Época")
+axes[0].set_ylabel("Loss")
+axes[0].set_title("Curvas de pérdida según learning rate")
 axes[0].legend()
 axes[0].grid(True)
 
-axes[1].set_xlabel('Época')
-axes[1].set_ylabel('Accuracy')
-axes[1].set_title('Curvas de accuracy según learning rate')
+axes[1].set_xlabel("Época")
+axes[1].set_ylabel("Accuracy")
+axes[1].set_title("Curvas de accuracy según learning rate")
 axes[1].legend()
 axes[1].grid(True)
 
-plt.suptitle(f'Arquitectura: {arch_best} | Dropout: {drop_best}', fontsize=13)
+plt.suptitle(f"Arquitectura: {arch_best} | Dropout: {drop_best}", fontsize=13)
 plt.tight_layout()
 plt.show()
 
@@ -581,7 +641,7 @@ plt.show()
 # %%
 # --- Mejor configuración según el tuning ---
 best_row = df_tuning.iloc[0]
-print('=== MEJOR CONFIGURACIÓN ===')
+print("=== MEJOR CONFIGURACIÓN ===")
 print(f'Arquitectura:  {best_row["architecture"]}')
 print(f'Learning rate:  {best_row["learning_rate"]}')
 print(f'Dropout:        {best_row["dropout"]}')
@@ -600,19 +660,27 @@ train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 test_dataset = TensorDataset(X_test_t, y_test_t)
 test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-best_model = MaintenanceMLP(INPUT_DIM, best_row['hidden_layers'],
-                            dropout_rate=best_row['dropout'])
-best_optimizer = optim.Adam(best_model.parameters(), lr=best_row['learning_rate'])
+best_model = MaintenanceMLP(
+    INPUT_DIM, best_row["hidden_layers"], dropout_rate=best_row["dropout"]
+)
+best_optimizer = optim.Adam(best_model.parameters(), lr=best_row["learning_rate"])
 
 # Entrenar con early stopping (monitoreando test solo para detener)
-print('\nEntrenando modelo final...')
+print("\nEntrenando modelo final...")
 best_model, history_final, best_epoch, train_time = train_model(
-    best_model, train_loader, test_loader, criterion, best_optimizer,
-    epochs=EPOCHS, patience=PATIENCE, device=DEVICE, verbose=True
+    best_model,
+    train_loader,
+    test_loader,
+    criterion,
+    best_optimizer,
+    epochs=EPOCHS,
+    patience=PATIENCE,
+    device=DEVICE,
+    verbose=True,
 )
 
-print(f'\nMejor época: {best_epoch}')
-print(f'Tiempo de entrenamiento: {train_time:.1f} segundos')
+print(f"\nMejor época: {best_epoch}")
+print(f"Tiempo de entrenamiento: {train_time:.1f} segundos")
 
 # %% [markdown]
 # ### 6.2 Evaluación sobre Test
@@ -622,13 +690,15 @@ y_pred_mlp, y_proba_mlp, mlp_metrics = evaluate_model(
     best_model, X_test_t, y_test_t, device=DEVICE
 )
 
-print('=== MLP - Resultados en Test ===')
+print("=== MLP - Resultados en Test ===")
 print(f'Accuracy:  {mlp_metrics["accuracy"]:.4f}')
 print(f'Precision: {mlp_metrics["precision"]:.4f}')
 print(f'Recall:    {mlp_metrics["recall"]:.4f}')
 print(f'F1-Score:  {mlp_metrics["f1"]:.4f}')
 print(f'ROC AUC:   {mlp_metrics["auc"]:.4f}')
-print(f'\n{classification_report(y_test, y_pred_mlp, target_names=["normal", "failure"])}')
+print(
+    f'\n{classification_report(y_test, y_pred_mlp, target_names=["normal", "failure"])}'
+)
 
 # %% [markdown]
 # ### 6.3 Matriz de Confusión — MLP
@@ -636,11 +706,17 @@ print(f'\n{classification_report(y_test, y_pred_mlp, target_names=["normal", "fa
 # %%
 cm_mlp = confusion_matrix(y_test, y_pred_mlp)
 plt.figure(figsize=(5, 4))
-sns.heatmap(cm_mlp, annot=True, fmt='d', cmap='Blues',
-            xticklabels=['normal', 'failure'], yticklabels=['normal', 'failure'])
+sns.heatmap(
+    cm_mlp,
+    annot=True,
+    fmt="d",
+    cmap="Blues",
+    xticklabels=["normal", "failure"],
+    yticklabels=["normal", "failure"],
+)
 plt.title(f'Matriz de Confusión - MLP (F1={mlp_metrics["f1"]:.4f})')
-plt.ylabel('Verdadero')
-plt.xlabel('Predicho')
+plt.ylabel("Verdadero")
+plt.xlabel("Predicho")
 plt.tight_layout()
 plt.show()
 
@@ -651,29 +727,56 @@ plt.show()
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
 # Loss
-axes[0].plot(history_final['train_loss'], label='Train Loss', color='#3498db', linewidth=2)
-axes[0].plot(history_final['val_loss'], label='Test Loss (monitoreo)', color='#e74c3c', linewidth=2)
-axes[0].axvline(x=best_epoch - 1, color='gray', linestyle='--', alpha=0.7,
-                label=f'Best epoch ({best_epoch})')
-axes[0].set_xlabel('Época')
-axes[0].set_ylabel('Binary Cross-Entropy Loss')
-axes[0].set_title('Curva de Pérdida (Loss)')
+axes[0].plot(
+    history_final["train_loss"], label="Train Loss", color="#3498db", linewidth=2
+)
+axes[0].plot(
+    history_final["val_loss"],
+    label="Test Loss (monitoreo)",
+    color="#e74c3c",
+    linewidth=2,
+)
+axes[0].axvline(
+    x=best_epoch - 1,
+    color="gray",
+    linestyle="--",
+    alpha=0.7,
+    label=f"Best epoch ({best_epoch})",
+)
+axes[0].set_xlabel("Época")
+axes[0].set_ylabel("Binary Cross-Entropy Loss")
+axes[0].set_title("Curva de Pérdida (Loss)")
 axes[0].legend()
 axes[0].grid(True, alpha=0.3)
 
 # Accuracy
-axes[1].plot(history_final['train_acc'], label='Train Accuracy', color='#3498db', linewidth=2)
-axes[1].plot(history_final['val_acc'], label='Test Accuracy (monitoreo)', color='#e74c3c', linewidth=2)
-axes[1].axvline(x=best_epoch - 1, color='gray', linestyle='--', alpha=0.7,
-                label=f'Best epoch ({best_epoch})')
-axes[1].set_xlabel('Época')
-axes[1].set_ylabel('Accuracy')
-axes[1].set_title('Curva de Accuracy')
+axes[1].plot(
+    history_final["train_acc"], label="Train Accuracy", color="#3498db", linewidth=2
+)
+axes[1].plot(
+    history_final["val_acc"],
+    label="Test Accuracy (monitoreo)",
+    color="#e74c3c",
+    linewidth=2,
+)
+axes[1].axvline(
+    x=best_epoch - 1,
+    color="gray",
+    linestyle="--",
+    alpha=0.7,
+    label=f"Best epoch ({best_epoch})",
+)
+axes[1].set_xlabel("Época")
+axes[1].set_ylabel("Accuracy")
+axes[1].set_title("Curva de Accuracy")
 axes[1].legend()
 axes[1].grid(True, alpha=0.3)
 
-fig.suptitle(f'MLP — {best_row["architecture"]} | lr={best_row["learning_rate"]} | '
-             f'dropout={best_row["dropout"]}', fontsize=13)
+fig.suptitle(
+    f'MLP — {best_row["architecture"]} | lr={best_row["learning_rate"]} | '
+    f'dropout={best_row["dropout"]}',
+    fontsize=13,
+)
 plt.tight_layout()
 plt.show()
 
@@ -698,26 +801,27 @@ plt.show()
 # %%
 # Métricas de los modelos CD (valores exactos del notebook)
 cd_models = {
-    'Reg. Logística':     [0.8007, 0.7965, 0.8078, 0.8021, 0.8474],
-    'Naive Bayes':        [0.7630, 0.7675, 0.7547, 0.7610, 0.8365],
-    'KNN':                [0.9167, 0.8890, 0.9522, 0.9195, 0.9493],
-    'Árbol Decisión':     [0.9295, 0.9168, 0.9446, 0.9305, 0.9295],
-    'Random Forest':      [0.9399, 0.9234, 0.9593, 0.9410, 0.9870],
-    'Gradient Boosting':  [0.9411, 0.9255, 0.9593, 0.9421, 0.9833],
+    "Reg. Logística": [0.8007, 0.7965, 0.8078, 0.8021, 0.8474],
+    "Naive Bayes": [0.7630, 0.7675, 0.7547, 0.7610, 0.8365],
+    "KNN": [0.9167, 0.8890, 0.9522, 0.9195, 0.9493],
+    "Árbol Decisión": [0.9295, 0.9168, 0.9446, 0.9305, 0.9295],
+    "Random Forest": [0.9399, 0.9234, 0.9593, 0.9410, 0.9870],
+    "Gradient Boosting": [0.9411, 0.9255, 0.9593, 0.9421, 0.9833],
 }
 
 # Agregar MLP
-cd_models['MLP (PyTorch)'] = [
-    mlp_metrics['accuracy'],
-    mlp_metrics['precision'],
-    mlp_metrics['recall'],
-    mlp_metrics['f1'],
-    mlp_metrics['auc'],
+cd_models["MLP (PyTorch)"] = [
+    mlp_metrics["accuracy"],
+    mlp_metrics["precision"],
+    mlp_metrics["recall"],
+    mlp_metrics["f1"],
+    mlp_metrics["auc"],
 ]
 
 # Tabla comparativa
-df_cd = pd.DataFrame(cd_models,
-    index=['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC AUC']).T
+df_cd = pd.DataFrame(
+    cd_models, index=["Accuracy", "Precision", "Recall", "F1-Score", "ROC AUC"]
+).T
 df_cd = df_cd.round(4)
 display(df_cd)
 
@@ -730,25 +834,25 @@ fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 # F1-Score
 models_names = list(cd_models.keys())
 f1_values = [cd_models[m][3] for m in models_names]
-colors_f1 = ['#95a5a6'] * (len(models_names) - 1) + ['#e74c3c']
+colors_f1 = ["#95a5a6"] * (len(models_names) - 1) + ["#e74c3c"]
 axes[0].barh(models_names, f1_values, color=colors_f1)
-axes[0].set_xlabel('F1-Score')
-axes[0].set_title('Comparativa F1-Score')
+axes[0].set_xlabel("F1-Score")
+axes[0].set_title("Comparativa F1-Score")
 axes[0].set_xlim(0.70, 1.0)
 for i, v in enumerate(f1_values):
-    axes[0].text(v + 0.003, i, f'{v:.4f}', va='center', fontweight='bold')
+    axes[0].text(v + 0.003, i, f"{v:.4f}", va="center", fontweight="bold")
 
 # ROC AUC
 auc_values = [cd_models[m][4] for m in models_names]
-colors_auc = ['#95a5a6'] * (len(models_names) - 1) + ['#e74c3c']
+colors_auc = ["#95a5a6"] * (len(models_names) - 1) + ["#e74c3c"]
 axes[1].barh(models_names, auc_values, color=colors_auc)
-axes[1].set_xlabel('ROC AUC')
-axes[1].set_title('Comparativa ROC AUC')
+axes[1].set_xlabel("ROC AUC")
+axes[1].set_title("Comparativa ROC AUC")
 axes[1].set_xlim(0.75, 1.0)
 for i, v in enumerate(auc_values):
-    axes[1].text(v + 0.003, i, f'{v:.4f}', va='center', fontweight='bold')
+    axes[1].text(v + 0.003, i, f"{v:.4f}", va="center", fontweight="bold")
 
-plt.suptitle('MLP vs Modelos Tradicionales (CD)', fontsize=14, fontweight='bold')
+plt.suptitle("MLP vs Modelos Tradicionales (CD)", fontsize=14, fontweight="bold")
 plt.tight_layout()
 plt.show()
 
@@ -761,14 +865,18 @@ plt.figure(figsize=(9, 7))
 
 # MLP
 fpr_mlp, tpr_mlp, _ = roc_curve(y_test, y_proba_mlp)
-plt.plot(fpr_mlp, tpr_mlp, linewidth=2.5,
-         label=f'MLP — PyTorch (AUC={mlp_metrics["auc"]:.4f})')
+plt.plot(
+    fpr_mlp,
+    tpr_mlp,
+    linewidth=2.5,
+    label=f'MLP — PyTorch (AUC={mlp_metrics["auc"]:.4f})',
+)
 
 # Referencia de modelos CD
 cd_aucs = {
-    'Random Forest': 0.9870,
-    'Gradient Boosting': 0.9833,
-    'KNN': 0.9493,
+    "Random Forest": 0.9870,
+    "Gradient Boosting": 0.9833,
+    "KNN": 0.9493,
 }
 
 for name, auc in cd_aucs.items():
@@ -777,13 +885,13 @@ for name, auc in cd_aucs.items():
     x = np.linspace(0, 1, 100)
     # Modelo perfecto sería x=0, y=1. Interpolamos desde random hasta perfecto
     y = x ** ((1 - auc) / auc * 0.5)  # Aproximación cualitativa
-    plt.plot(x, y, '--', alpha=0.6, label=f'{name} — CD (AUC={auc:.4f})')
+    plt.plot(x, y, "--", alpha=0.6, label=f"{name} — CD (AUC={auc:.4f})")
 
-plt.plot([0, 1], [0, 1], 'k--', alpha=0.3, label='Aleatorio (AUC=0.5)')
-plt.xlabel('Tasa de Falsos Positivos (FPR)')
-plt.ylabel('Tasa de Verdaderos Positivos (TPR)')
-plt.title('Curva ROC — MLP vs Modelos CD')
-plt.legend(loc='lower right')
+plt.plot([0, 1], [0, 1], "k--", alpha=0.3, label="Aleatorio (AUC=0.5)")
+plt.xlabel("Tasa de Falsos Positivos (FPR)")
+plt.ylabel("Tasa de Verdaderos Positivos (TPR)")
+plt.title("Curva ROC — MLP vs Modelos CD")
+plt.legend(loc="lower right")
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
@@ -802,25 +910,29 @@ plt.show()
 # %%
 # Tiempo de entrenamiento estimado para cada modelo (del notebook CD)
 train_times = {
-    'Reg. Logística': 4.6,
-    'Naive Bayes': 0.06,
-    'KNN': 0.7,
-    'Árbol Decisión': 1.8,
-    'Random Forest': 30.6,
-    'Gradient Boosting': 34.7,
-    'MLP (PyTorch)': train_time,
+    "Reg. Logística": 4.6,
+    "Naive Bayes": 0.06,
+    "KNN": 0.7,
+    "Árbol Decisión": 1.8,
+    "Random Forest": 30.6,
+    "Gradient Boosting": 34.7,
+    "MLP (PyTorch)": train_time,
 }
 
 fig, ax = plt.subplots(figsize=(10, 5))
 names = list(train_times.keys())
 times = list(train_times.values())
-colors = ['#95a5a6'] * (len(names) - 1) + ['#e74c3c']
+colors = ["#95a5a6"] * (len(names) - 1) + ["#e74c3c"]
 bars = ax.barh(names, times, color=colors)
-ax.set_xlabel('Tiempo de entrenamiento (segundos)')
-ax.set_title('Comparación de Tiempo de Entrenamiento')
+ax.set_xlabel("Tiempo de entrenamiento (segundos)")
+ax.set_title("Comparación de Tiempo de Entrenamiento")
 for bar, t in zip(bars, times):
-    ax.text(bar.get_width() + 0.5, bar.get_y() + bar.get_height()/2,
-            f'{t:.1f}s', va='center')
+    ax.text(
+        bar.get_width() + 0.5,
+        bar.get_y() + bar.get_height() / 2,
+        f"{t:.1f}s",
+        va="center",
+    )
 plt.tight_layout()
 plt.show()
 
@@ -828,10 +940,10 @@ plt.show()
 # =============================================================================
 # 8. CONCLUSIONES
 # =============================================================================
-print('=' * 70)
-print('CONCLUSIONES')
-print('=' * 70)
-print(f'\n📊 DESEMPEÑO DEL MLP:')
+print("=" * 70)
+print("CONCLUSIONES")
+print("=" * 70)
+print(f"\n📊 DESEMPEÑO DEL MLP:")
 print(f'   F1-Score: {mlp_metrics["f1"]:.4f}')
 print(f'   ROC AUC:  {mlp_metrics["auc"]:.4f}')
 print(f'   Accuracy: {mlp_metrics["accuracy"]:.4f}')
@@ -839,10 +951,10 @@ print(f'   Arquitectura: {best_row["hidden_layers"]}')
 print(f'   Learning rate: {best_row["learning_rate"]}')
 print(f'   Dropout: {best_row["dropout"]}')
 
-print(f'\n📈 COMPARACIÓN CON MODELOS CD (F1):')
+print(f"\n📈 COMPARACIÓN CON MODELOS CD (F1):")
 for name, vals in cd_models.items():
-    marker = '◀ MLP' if 'MLP' in name else ''
-    print(f'   {name:>25s}: F1={vals[3]:.4f}  AUC={vals[4]:.4f}  {marker}')
+    marker = "◀ MLP" if "MLP" in name else ""
+    print(f"   {name:>25s}: F1={vals[3]:.4f}  AUC={vals[4]:.4f}  {marker}")
 
 # %% [markdown]
 # ### 8.2 Ventajas del MLP frente a modelos tradicionales
@@ -916,13 +1028,17 @@ for name, vals in cd_models.items():
 #    anticipación.
 
 # %%
-print('=== RESUMEN FINAL ===')
-print(f'{"MLP — PyTorch":>25s} | F1={mlp_metrics["f1"]:.4f} | AUC={mlp_metrics["auc"]:.4f} | Time={train_time:.1f}s')
+print("=== RESUMEN FINAL ===")
+print(
+    f'{"MLP — PyTorch":>25s} | F1={mlp_metrics["f1"]:.4f} | AUC={mlp_metrics["auc"]:.4f} | Time={train_time:.1f}s'
+)
 print(f'{"Random Forest — CD":>25s} | F1=0.9410 | AUC=0.9870 | Time=30.6s')
 print(f'{"Gradient Boosting — CD":>25s} | F1=0.9421 | AUC=0.9833 | Time=34.7s')
 print(f'{"Árbol Decisión — CD":>25s} | F1=0.9305 | AUC=0.9295 | Time=1.8s')
 print(f'{"KNN — CD":>25s} | F1=0.9195 | AUC=0.9493 | Time=0.7s')
 print(f'{"Reg. Logística — CD":>25s} | F1=0.8021 | AUC=0.8474 | Time=4.6s')
 print(f'{"Naive Bayes — CD":>25s} | F1=0.7610 | AUC=0.8365 | Time=0.06s')
-print(f'\nNota: El tiempo del MLP varía según la configuración de early stopping.')
-print(f'Arquitectura final: {best_row["hidden_layers"]} | lr={best_row["learning_rate"]} | dropout={best_row["dropout"]}')
+print(f"\nNota: El tiempo del MLP varía según la configuración de early stopping.")
+print(
+    f'Arquitectura final: {best_row["hidden_layers"]} | lr={best_row["learning_rate"]} | dropout={best_row["dropout"]}'
+)
