@@ -23,7 +23,3 @@ La red implementada en `tp_ia.ipynb` es un Perceptrón Multicapa (MLP) diseñado
 - **Comparabilidad:** Al usar exactamente el mismo `train_test_split` (mismos archivos CSV), las métricas obtenidas por la red neuronal son 100% comparables con las de Regresión Logística, Random Forest, etc.
 - **Arquitectura:** El diseño del MLP es justificado, moderno y sigue buenas prácticas (Batch Normalization, Dropout, Early Stopping).
 
-## Sugerencias de Mejora
-1. **Optimización de hiperparámetros de la Red Neuronal:** Aunque el modelo base tiene una arquitectura sensata, se podrían emplear bibliotecas como *Optuna* para buscar la combinación ideal de tasa de aprendizaje, tamaño de *batch* y número de neuronas.
-2. **Análisis de Importancia de Variables en IA:** Implementar técnicas como *SHAP* (SHapley Additive exPlanations) o *Integrated Gradients* para entender qué variables (ej. temperatura, torque, desgaste) están influyendo más en la decisión del MLP, aportando interpretabilidad al modelo "caja negra".
-3. **Métricas de Negocio:** Más allá del F1-Score o ROC AUC, sería interesante evaluar el modelo en función de una matriz de costos (ej. cuánto cuesta un falso positivo vs. un falso negativo en la planta industrial) para definir el umbral óptimo de decisión.
