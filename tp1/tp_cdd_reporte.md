@@ -33,10 +33,10 @@
    - [6.3 Imputación bivariada con KMeans para pares correlacionados](#63-imputación-bivariada-con-kmeans-para-pares-correlacionados)
    - [6.4 Resumen de la pipeline completa](#64-resumen-de-la-pipeline-completa)
 7. [Errores detectados y correcciones aplicadas](#7-errores-detectados-y-correcciones-aplicadas)
-   - [7.1 Error en la normalización: `Normalizer()` en lugar de `StandardScaler()`](#71--corregido--error-en-la-normalización-normalizer-en-lugar-de-standardscaler)
-   - [7.2 Mensaje de umbral inconsistente en la salida](#72--corregido--mensaje-de-umbral-inconsistente-en-la-salida)
+   - [7.1 Error en la normalización: `Normalizer()` en lugar de `StandardScaler()`](#71-error-en-la-normalización-normalizer-en-lugar-de-standardscaler)
+   - [7.2 Mensaje de umbral inconsistente en la salida](#72-mensaje-de-umbral-inconsistente-en-la-salida)
    - [7.3 Discrepancia menor en las conclusiones del EDA](#73-discrepancia-menor-en-las-conclusiones-del-eda)
-   - [7.4 Execution counts inconsistentes en el notebook original](#74--corregido--execution-counts-inconsistentes-en-el-notebook-original)
+   - [7.4 Execution counts inconsistentes en el notebook original](#74-execution-counts-inconsistentes-en-el-notebook-original)
 8. [Conclusiones generales y recomendaciones](#8-conclusiones-generales-y-recomendaciones)
 
 ---
@@ -216,7 +216,7 @@ La etapa final del preprocesamiento transforma el dataset en un formato completa
 | Shape de X | (14.078, 7) |
 | Shape de y | (14.078,) |
 | Balance de clases | 50 % / 50 % |
-| Distribución de product_type en test | L: 70.5 %, M: 19.6 %, H: 9.9 % |
+| Distribución de product_type en test | L: 70.4 %, M: 19.7 %, H: 9.9 % |
 | Columnas | 5 numéricas estandarizadas + 2 one-hot de product_type |
 
 ---
@@ -229,7 +229,7 @@ La fase de modelado constituye la culminación técnica del trabajo. Sobre los d
 
 El primer paso consiste en separar el dataset balanceado en dos conjuntos disjuntos: uno de entrenamiento, que contendrá el 70 % de las observaciones (9.854 instancias), y uno de prueba con el 30 % restante (4.224 instancias). La división se realiza con `train_test_split` utilizando el parámetro `stratify=y_bal`, lo que garantiza que la proporción de clases se mantenga exactamente en 50/50 tanto en entrenamiento como en prueba. La semilla aleatoria se fija en 42 para asegurar la reproducibilidad completa del experimento.
 
-Como producto adicional de esta etapa, los conjuntos de entrenamiento y prueba se exportan a los archivos `train_data.csv` y `test_data.csv`, lo que facilita la reutilización de los datos procesados en futuras iteraciones del proyecto sin necesidad de re-ejecutar todo el pipeline de preprocesamiento. Adicionalmente, se verifica la distribución de `product_type` en el conjunto de prueba, confirmando que la proporción de los tipos L, M y H (70.5 %, 19.6 % y 9.9 % respectivamente) es consistente con la distribución observada en el dataset original.
+Como producto adicional de esta etapa, los conjuntos de entrenamiento y prueba se exportan a los archivos `train_data.csv` y `test_data.csv`, lo que facilita la reutilización de los datos procesados en futuras iteraciones del proyecto sin necesidad de re-ejecutar todo el pipeline de preprocesamiento. Adicionalmente, se verifica la distribución de `product_type` en el conjunto de prueba, confirmando que la proporción de los tipos L, M y H (70.4 %, 19.7 % y 9.9 % respectivamente) es consistente con la distribución observada en el dataset original.
 
 ### 5.2 Estrategia de validación cruzada
 
@@ -323,7 +323,7 @@ El notebook sintetiza la pipeline en siete pasos, proporcionando una visión pan
 
 Durante la revisión del notebook se identificaron cuatro incidencias, de las cuales dos eran errores de código con impacto material en los resultados y dos eran discrepancias cosméticas o artefactos de ejecución. Las dos incidencias con impacto han sido corregidas y el notebook re-ejecutado en su totalidad. A continuación se documentan todas ellas con el detalle necesario para comprender su naturaleza, su impacto y la corrección aplicada.
 
-### 7.1 ✅ CORREGIDO — Error en la normalización: `Normalizer()` en lugar de `StandardScaler()`
+### 7.1 Error en la normalización: `Normalizer()` en lugar de `StandardScaler()`
 
 **Ubicación:** Celda `76e62fae` (Parte 2, «Procesamiento de categóricas, balance y normalización»).
 
@@ -346,7 +346,7 @@ scaler = StandardScaler()
 
 **Impacto verificado:** Tras reemplazar `Normalizer` por `StandardScaler` y re-ejecutar el notebook completo, todos los modelos modificaron sus resultados. La Regresión Logística experimentó la mejora más drástica, pasando de un F1 de 0.79 a 0.84 —una ganancia de 5 puntos porcentuales que confirma que el modelo lineal es particularmente sensible a la escala incorrecta de las features. Naive Bayes, en cambio, descendió de 0.85 a 0.82, reflejando que la normalización L2 anterior enmascaraba artificialmente las correlaciones entre features que violan su supuesto de independencia. Los modelos de árboles también mostraron mejoras (DT de 0.94 a 0.96, RF de 0.95 a 0.97, GB de 0.95 a 0.98), lo cual sugiere que las salidas del notebook original no correspondían a una ejecución limpia desde cero sino que incluían resultados stale de ejecuciones parciales previas. El ranking final —GB > RF > DT ≈ KNN > LR > NB— es ahora plenamente consistente con lo que la teoría predice para cada familia algorítmica.
 
-### 7.2 ✅ CORREGIDO — Mensaje de umbral inconsistente en la salida
+### 7.2 Mensaje de umbral inconsistente en la salida
 
 **Ubicación:** Celda `corr_feature_removal`.
 
@@ -369,7 +369,7 @@ print(f'No se detectaron pares con correlacion > {umbral}')
 
 La conclusión del EDA afirma que la correlación entre `speed [RPM]` y `torque [Nm]` es «~-0.82». Sin embargo, la matriz de correlación del propio EDA —visualizada en el heatmap de la celda `62ff3253`— muestra un valor de −0.85. La diferencia de 0.03 en valor absoluto no altera la interpretación cualitativa (sigue siendo una correlación negativa fuerte en ambos casos), pero introduce una pequeña inconsistencia entre la afirmación textual y la evidencia numérica presentada. Es posible que el valor ~-0.82 provenga de una versión anterior del notebook donde los datos aún no habían sido depurados (por ejemplo, con los 47 valores de RPM ≤ 0 todavía presentes), lo que explicaría una correlación ligeramente más débil. En cualquier caso, se trata de una discrepancia menor que no afecta las conclusiones sustantivas del trabajo.
 
-### 7.4 ✅ CORREGIDO — Execution counts inconsistentes en el notebook original
+### 7.4 Execution counts inconsistentes en el notebook original
 
 **Ubicación:** Metadatos de las celdas de código.
 
@@ -399,9 +399,8 @@ Con los datos correctamente escalados, **Gradient Boosting** emerge como el clas
 
 ### Recomendaciones para trabajo futuro
 
-1. ~~Corregir la normalización~~ ✅ **Ya corregido.** `StandardScaler` reemplazó a `Normalizer` y el notebook fue re-ejecutado en su totalidad.
-
-2. ~~Corregir el mensaje del umbral~~ ✅ **Ya corregido.** La salida ahora referencia correctamente la variable `umbral`.
+1. **Validar normalización estandarizada continua.** `StandardScaler` reemplazó adecuadamente a `Normalizer` en las iteraciones finales, lo cual es crítico mantener en despliegues a producción.
+2. **Mantener consistencia en la salida de hiperparámetros.** Se corrigió exitosamente la salida que referencia dinámicamente la variable `umbral`.
 
 3. **Implementar validación cruzada anidada (nested CV)**. Actualmente, la selección de hiperparámetros y la estimación del error de generalización comparten el mismo conjunto de prueba, lo que puede producir estimaciones optimistas del rendimiento. Una estructura de nested CV —donde un bucle externo evalúa el error de generalización y un bucle interno selecciona hiperparámetros— proporcionaría estimaciones no sesgadas, particularmente relevante dado que varios modelos alcanzan métricas superiores a 0.97.
 
