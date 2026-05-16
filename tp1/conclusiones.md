@@ -23,3 +23,8 @@ La red implementada en `tp_ia.ipynb` es un Perceptrón Multicapa (MLP) diseñado
 - **Comparabilidad:** Al usar exactamente el mismo `train_test_split` (mismos archivos CSV), las métricas obtenidas por la red neuronal son 100% comparables con las de Regresión Logística, Random Forest, etc.
 - **Arquitectura:** El diseño del MLP es justificado, moderno y sigue buenas prácticas (Batch Normalization, Dropout, Early Stopping).
 
+## Evaluación del modelo (IA)
+- **Métricas:** Se reportan accuracy, precision, recall, F1 y AUC-ROC sobre test, junto con matriz de confusión.
+- **Curvas de aprendizaje:** Loss y accuracy de train/validación convergen con brecha acotada, indicando buena generalización.
+- **Early stopping:** Selecciona la mejor época de validación y evita sobreajuste antes de evaluar en test.
+
