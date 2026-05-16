@@ -1,321 +1,373 @@
-# Trabajo Práctico: Red Neuronal MLP para Mantenimiento Predictivo Industrial
+# Trabajo Practico: Red Neuronal MLP para Mantenimiento Predictivo Industrial
 
-## Integración de Ciencia de Datos e Inteligencia Artificial
+## Integracion de Ciencia de Datos e Inteligencia Artificial
 
 ---
 
-## 1. Introducción y Objetivos
+## 1. Introduccion y Objetivos
 
 ### 1.1 Contexto del Trabajo
 
-Este Trabajo Práctico integra los contenidos de las materias **Ciencia de Datos (CD)** e **Inteligencia Artificial (IA)** mediante un pipeline unificado de procesamiento y modelado. El objetivo principal es desarrollar un modelo de Red Neuronal (MLP - Perceptrón Multicapa) para predecir fallas en máquinas industriales, comparando sus resultados con los modelos tradicionales desarrollados en la materia de Ciencia de Datos.
+Este Trabajo Practico integra los contenidos de **Ciencia de Datos (CD)** e **Inteligencia Artificial (IA)** mediante un pipeline unico de preprocesamiento y evaluacion. El notebook de CD (`tp_cdd.ipynb`) limpia, transforma, balancea, escala y exporta los datos. El notebook de IA (`tp_ia.ipynb`) consume esos archivos exportados para entrenar una red neuronal MLP y comparar sus resultados contra los modelos tradicionales.
 
-### 1.2 Objetivos Específicos
+La idea central es evitar dos pipelines distintos que produzcan resultados no comparables. CD define el dataset final; IA entrena sobre exactamente el mismo `train_data.csv` y evalua sobre exactamente el mismo `test_data.csv`.
 
-1. **Aplicar** los conocimientos de redes neuronales para un problema de clasificación binaria real
-2. **Diseñar** y **ajustar** una arquitectura MLP mediante la exploración sistemática de hiperparámetros
-3. **Comparar** el desempeño del MLP con los modelos tradicionales de Ciencia de Datos
-4. **Documentar** el proceso de manera rigurosa, siguiendo las buenas prácticas de la materia
+### 1.2 Objetivos Especificos
+
+1. Aplicar redes neuronales a un problema realista de clasificacion binaria.
+2. Entrenar una arquitectura MLP con PyTorch sobre datos tabulares industriales.
+3. Ajustar hiperparametros de manera sistematica y justificar la configuracion final.
+4. Comparar el MLP contra modelos tradicionales entrenados en CD sobre el mismo split.
+5. Documentar resultados consistentes con los archivos exportados y las salidas actuales de la notebook.
 
 ---
 
-## 2. Descripción del Dataset
+## 2. Dataset
 
 ### 2.1 Origen y Naturaleza de los Datos
 
-El dataset utilizado (`i40.csv`) corresponde a un escenario de **mantenimiento predictivo industrial** (predictive maintenance). Contiene mediciones de sensores en máquinas industriales, con el objetivo de predecir si una máquina presentará una falla (failure) o funcionará normalmente (normal).
+El dataset `i40.csv` representa un escenario de **mantenimiento predictivo industrial**. Contiene mediciones operativas de maquinas y una variable objetivo que indica si la observacion corresponde a funcionamiento normal (`normal`) o a falla (`failure`).
 
-### 2.2 Características del Dataset
+### 2.2 Caracteristicas Iniciales
 
-| Característica | Valor |
+| Caracteristica | Valor |
 |----------------|-------|
-| Total de muestras | 14,521 |
-| Variables de entrada | 7 |
-| Variable objetivo | target (normal/failure) |
-| Distribución inicial | 51.53% failure, 48.47% normal |
-| Valores nulos | 40 en air_temp [K] |
+| Filas originales | 14,521 |
+| Columnas originales | 9 |
+| Variables predictoras utiles | 6 columnas originales: 5 numericas + `product_type` |
+| Variables identificadoras descartadas | `idx`, `parent_device_id` |
+| Variable objetivo | `target` (`normal` / `failure`) |
+| Distribucion inicial | 51.53% `failure`, 48.47% `normal` |
+| Valores nulos | 40 en `air_temp [K]` |
+| Valores invalidos detectados | 47 registros con `speed [RPM] <= 0` |
 
 ### 2.3 Variables del Dataset
 
-**Variables Numéricas:**
-- `air_temp [K]`: Temperatura del aire (rango: 295.3 - 304.5 K)
-- `process_temp [K]`: Temperatura del proceso (rango: 305.7 - 313.8 K)
-- `speed [RPM]`: Velocidad de rotación (rango: -1 a 2886 RPM)
-- `torque [Nm]`: Torque (rango: 3.8 - 76.6 Nm)
-- `tool_wear [min]`: Desgaste de herramienta (rango: 0 - 253 min)
+**Variables numericas:**
 
-**Variables Categóricas:**
-- `product_type`: Tipo de producto (L: 71.36%, M: 18.53%, H: 10.11%)
-- `target`: Variable objetivo (normal/failure)
+| Variable | Rango original | Observacion |
+|----------|----------------|-------------|
+| `air_temp [K]` | 295.3 - 304.5 | 40 nulos, imputados durante CD |
+| `process_temp [K]` | 305.7 - 313.8 | Alta correlacion con `air_temp [K]` |
+| `speed [RPM]` | -1 - 2886 | 47 valores fisicamente invalidos tratados como faltantes |
+| `torque [Nm]` | 3.8 - 76.6 | Alta correlacion negativa con `speed [RPM]` |
+| `tool_wear [min]` | 0 - 253 | Desgaste acumulado de herramienta |
 
----
+**Variables categoricas:**
 
-## 3. Preprocesamiento (Pipeline de Ciencia de Datos)
-
-### 3.1 Integración del Pipeline
-
-Una contribución importante de este trabajo fue el **desacople del preprocesamiento**: en lugar de repetir la limpieza de datos en el notebook de IA, el pipeline de CD exporta los conjuntos de datos limpios (`train_data.csv` y `test_data.csv`) directamente después de realizar el `train_test_split`. El notebook de IA carga estos archivos directamente, eliminando redundancias y asegurando que ambos modelos se evalúen sobre los mismos conjuntos de datos.
-
-### 3.2 Pasos de Preprocesamiento Realizados en CD
-
-1. **Limpieza de datos**: Eliminación de valores nulos (40 registros en air_temp)
-2. **Selección de features**: Eliminación de `idx` y `parent_device_id` (identificadores)
-3. **One-hot encoding**: Conversión de `product_type` a variables binarias (product_type_L, product_type_M)
-4. **Normalización**: Aplicación de Normalizer de scikit-learn
-5. **Balanceo**: Undersampling para obtener distribución 50/50 (4927 failure, 4927 normal)
-6. **División train/test**: 70% entrenamiento (9854), 30% test (4224)
-
-### 3.3 Datos Resultantes para IA
-
-| Conjunto | Muestras | Features |
-|----------|----------|----------|
-| Train | 9,854 | 7 |
-| Test | 4,224 | 7 |
-| Distribución | 50% - 50% (balanceado) | ['air_temp [K]', 'process_temp [K]', 'speed [RPM]', 'torque [Nm]', 'tool_wear [min]', 'product_type_L', 'product_type_M'] |
+| Variable | Distribucion |
+|----------|--------------|
+| `product_type` | L: 71.36%, M: 18.53%, H: 10.11% |
+| `target` | `failure`: 51.53%, `normal`: 48.47% |
 
 ---
 
-## 4. Diseño de la Red Neuronal MLP
+## 3. Pipeline de Preprocesamiento de CD
 
-### 4.1 Arquitectura Propuesta
+### 3.1 Integracion CD-IA
 
-Se implementó un Perceptrón Multicapa (MLP) para clasificación binaria con la siguiente arquitectura:
+El notebook `tp_cdd.ipynb` es la fuente de verdad del preprocesamiento. Exporta:
 
+| Archivo | Uso |
+|---------|-----|
+| `train_data.csv` | Entrenamiento y validacion interna del MLP |
+| `test_data.csv` | Evaluacion final del MLP |
+| `resultados_modelos.csv` | Metricas finales de modelos tradicionales de CD |
+
+El notebook `tp_ia.ipynb` carga esos archivos directamente. Esto elimina duplicacion de limpieza y asegura comparabilidad directa entre modelos.
+
+### 3.2 Pasos Aplicados en CD
+
+1. Eliminacion de identificadores: `idx` y `parent_device_id`.
+2. Eliminacion de 72 filas duplicadas.
+3. Correccion de `speed [RPM] <= 0`: esos valores se trataron como faltantes.
+4. Imputacion bivariada con KMeans para pares correlacionados.
+5. Conservacion de variables correlacionadas cuando aportan informacion de dominio.
+6. Tratamiento de outliers con criterio IQR, sin clipping sobre `speed [RPM]` por representar regimenes operativos reales.
+7. One-hot encoding de `product_type` con `drop_first=True`.
+8. Binarizacion de `target`: `failure -> 1`, `normal -> 0`.
+9. Balanceo con `RandomUnderSampler` hasta distribucion 50/50.
+10. Escalado z-score con `StandardScaler` sobre columnas numericas.
+11. Split estratificado 70/30 y exportacion de `train_data.csv` y `test_data.csv`.
+
+### 3.3 Correccion Importante del Pipeline
+
+El pipeline actual reemplaza `Normalizer()` por `StandardScaler()`.
+
+Esto es clave porque `Normalizer()` escala por fila y proyecta cada muestra a norma unitaria, mientras que `StandardScaler()` estandariza por columna con media 0 y desvio estandar 1. Para datos tabulares, regresion logistica, KNN y redes neuronales, la estandarizacion por columna es la transformacion esperada.
+
+### 3.4 Datos Exportados para IA
+
+| Conjunto | Filas | Columnas totales | Features | Distribucion target |
+|----------|------:|-----------------:|---------:|---------------------|
+| Train | 9,854 | 8 | 7 | 4,927 normal / 4,927 failure |
+| Test | 4,224 | 8 | 7 | 2,112 normal / 2,112 failure |
+
+Columnas exportadas:
+
+| Tipo | Columnas |
+|------|----------|
+| Numericas estandarizadas | `air_temp [K]`, `process_temp [K]`, `speed [RPM]`, `torque [Nm]`, `tool_wear [min]` |
+| One-hot | `product_type_L`, `product_type_M` |
+| Target | `target` |
+
+La categoria `product_type_H` queda implicita cuando `product_type_L=False` y `product_type_M=False`.
+
+---
+
+## 4. Modelo MLP en IA
+
+### 4.1 Arquitectura Base
+
+El modelo implementado en `tp_ia.ipynb` es un MLP de clasificacion binaria:
+
+```text
+Input (7 features) -> [64] -> [32] -> [16] -> Output (1)
 ```
-Input (7 features) → [64] → [32] → [16] → Output (1)
-```
 
-**Componentes de cada capa oculta:**
-- Linear (transformación afín)
-- Batch Normalization (normalización de activaciones)
-- ReLU (función de activación)
-- Dropout (regularización)
+Cada capa oculta contiene:
 
-**Capa de salida:**
-- Linear → Sigmoid (probabilidad entre 0 y 1)
+| Componente | Funcion |
+|------------|---------|
+| Linear | Transformacion afin |
+| BatchNorm1d | Estabilizacion de activaciones |
+| ReLU | No linealidad |
+| Dropout | Regularizacion |
 
-### 4.2 Justificación del Diseño
+La salida usa una neurona con `Sigmoid`, por lo que devuelve una probabilidad de falla entre 0 y 1.
 
-| Aspecto | Decisión | Justificación |
-|---------|-----------|----------------|
-| **Número de capas** | 3 capas ocultas | Suficiente para capturar interacciones no lineales en datos tabulares de 7 features |
-| **Patrón [64→32→16]** | Funnel/embudo | Reduce progresivamente la dimensionalidad, forzando representaciones más abstractas |
-| **Función de activación** | ReLU | Eficiente computacionalmente, mitiga el gradiente evanescente |
-| **Dropout** | 0.4 (40%) | Regularización para prevenir overfitting |
-| **Batch Normalization** | Sí | Estabiliza y acelera el entrenamiento |
-| **Salida** | Sigmoid | Clasificación binaria con probabilidad en [0,1] |
-| **Función de pérdida** | BCE (Binary Cross-Entropy) | Estándar para clasificación binaria |
-| **Optimizador** | Adam | Convergencia rápida, tasas de aprendizaje adaptativas |
+### 4.2 Parametros del Modelo Base
 
-### 4.3 Parámetros del Modelo
-
-- **Parámetros entrenables**: 3,361
-- **Relación parámetros/datos**: ~2,475 muestras por parámetro (adecuada para evitar overfitting severo)
+| Elemento | Valor |
+|----------|------:|
+| Input features | 7 |
+| Capas ocultas base | [64, 32, 16] |
+| Dropout base de arquitectura | 0.4 |
+| Parametros entrenables | 3,361 |
+| Funcion de perdida | Binary Cross-Entropy |
+| Optimizador usado en modelo final | Adam |
 
 ---
 
 ## 5. Entrenamiento y Early Stopping
 
-### 5.1 Configuración de Entrenamiento
+### 5.1 Configuracion General
 
-- **Épocas máximas**: 200
-- **Patience**: 15 (early stopping si no mejora en 15 épocas consecutivas)
-- **Batch size**: 64
-- **Learning rate**: 0.001 (Adam)
-- **División train/val**: 85% train, 15% validación
+| Parametro | Valor |
+|-----------|------:|
+| Epocas maximas | 200 |
+| Patience | 15 |
+| Split interno train/validacion | 85% / 15% del train exportado |
+| Tune set | 8,375 muestras |
+| Validation set | 1,479 muestras |
+| Test set final | 4,224 muestras, reservado hasta la evaluacion final |
 
-### 5.2 Mecanismo de Early Stopping
+### 5.2 Criterio de Seleccion
 
-El early stopping es una técnica de regularización que:
-1. Monitorea la pérdida de validación en cada época
-2. Detiene el entrenamiento si no hay mejora durante `patience` épocas consecutivas
-3. Restaura los pesos del modelo en la época con mejor pérdida de validación
+La metrica principal del tuning es **F1-score en validacion**. Esta eleccion es adecuada porque el problema de mantenimiento predictivo penaliza tanto falsos positivos como falsos negativos:
 
-**Beneficio**: Evita overfitting y reduce el tiempo de entrenamiento al no entrenar innecesariamente cuando el modelo ya no mejora.
+| Error | Interpretacion |
+|-------|----------------|
+| Falso positivo | Parada o inspeccion innecesaria |
+| Falso negativo | Falla no detectada |
+
+El AUC-ROC se usa como metrica secundaria para medir capacidad discriminativa independiente del umbral.
 
 ---
 
-## 6. Ajuste de Hiperparámetros
+## 6. Ajuste de Hiperparametros
 
-### 6.1 Espacio de Búsqueda
+### 6.1 Espacio de Busqueda
 
-Se exploró un grid de **72 combinaciones**:
+Se exploraron **72 combinaciones**:
 
-| Hiperparámetro | Valores |
+| Hiperparametro | Valores |
 |----------------|---------|
 | Arquitectura | [32,16], [64,32], [64,32,16] |
 | Learning rate | 0.01, 0.001, 0.0005 |
 | Dropout | 0.3, 0.5 |
 | Batch size | 32, 64 |
-| Optimizador | Adam, SGD (momentum=0.9) |
+| Optimizador | Adam, SGD con momentum=0.9 |
 
-### 6.2 Resultados del Tuning
+### 6.2 Top 5 del Tuning Actual
 
-**Top 5 configuraciones por F1 en validación:**
+Valores tomados de la salida actual de `tp_ia.ipynb`.
 
-| # | Arquitectura | lr | Dropout | Batch | Opt | Val F1 | Val AUC | Épocas |
-|---|-------------|-----|---------|-------|-----|--------|---------|-------|
-| 1 | [64,32,16] | 0.001 | 0.3 | 64 | Adam | **0.9409** | 0.9802 | 86 |
-| 2 | [64,32] | 0.001 | 0.3 | 64 | Adam | 0.9317 | 0.9774 | 68 |
-| 3 | [64,32] | 0.0005 | 0.3 | 64 | Adam | 0.9284 | 0.9760 | 62 |
-| 4 | [64,32,16] | 0.001 | 0.5 | 64 | Adam | 0.9270 | 0.9753 | 68 |
-| 5 | [32,16] | 0.0005 | 0.3 | 64 | Adam | 0.9257 | 0.9717 | 50 |
+| # | Arquitectura | lr | Dropout | Batch | Opt | Val F1 | Val AUC | Mejor epoca | Tiempo |
+|---|--------------|---:|--------:|------:|-----|-------:|--------:|-------------:|-------:|
+| 1 | [64,32,16] | 0.0100 | 0.3 | 64 | Adam | **0.9533** | 0.9881 | 34 | 37.6s |
+| 2 | [64,32] | 0.0010 | 0.3 | 64 | Adam | 0.9524 | **0.9896** | 123 | 77.1s |
+| 3 | [64,32,16] | 0.0100 | 0.3 | 32 | Adam | 0.9503 | 0.9867 | 36 | 68.9s |
+| 4 | [64,32] | 0.0005 | 0.3 | 32 | Adam | 0.9500 | 0.9874 | 91 | 102.8s |
+| 5 | [64,32] | 0.0005 | 0.3 | 64 | Adam | 0.9489 | 0.9881 | 132 | 97.3s |
 
-**Peores configuraciones:**
-- Peor global: [64,32,16] + lr=0.01 + dropout=0.5 → F1=0.8807 (overfitting severo)
-- Patrón: TODAS las peores configuraciones usan lr=0.01 (learning rate demasiado alto)
+### 6.3 Lectura del Tuning
 
-### 6.3 Análisis del Impacto de Cada Hiperparámetro
+| Hallazgo | Evidencia |
+|----------|-----------|
+| Adam domina el top 5 | Todas las mejores configuraciones usan Adam |
+| Dropout 0.3 domina el top 5 | Todas las mejores configuraciones usan dropout 0.3 |
+| Batch 64 es competitivo | Gana la mejor configuracion y aparece 3 veces en top 5 |
+| lr=0.01 no fue malo en esta ejecucion | La mejor configuracion usa lr=0.01 |
+| [64,32] queda muy cerca de [64,32,16] | F1 0.9524 vs 0.9533 |
 
-**Learning Rate (hiperparámetro más impactante):**
+### 6.4 Configuracion Ganadora
 
-| lr | F1 Promedio | Diagnóstico |
-|----|-------------|--------------|
-| 0.01 | 0.9073 | Overfitting - converge rápido pero diverge |
-| 0.001 | **0.9230** | Balanceado - mejor performance sostenida |
-| 0.0005 | 0.9202 | Underfitting - converge lento, no llega al óptimo |
-
-**Arquitectura:**
-
-| Arquitectura | Mejor F1 | Tiempo Promedio | Parámetros |
-|--------------|----------|-----------------|------------|
-| [32,16] | 0.9138 | 12.0s | 1,377 |
-| [64,32] | 0.9269 | 15.5s | 2,721 |
-| [64,32,16] | 0.9305 | 20.8s | 3,361 |
-
-**Dropout:**
-
-| Dropout | F1 Promedio | Observación |
-|---------|-------------|--------------|
-| 0.3 | **0.9225** | Regularización suficiente |
-| 0.5 | 0.9122 | Sobre-regularización |
-
-**Optimizador:** Adam dominó consistentemente sobre SGD en el régimen de 200 épocas.
-
-### 6.4 Configuración Ganadora
-
-```
-Arquitectura:  [64, 32, 16]  (3 capas ocultas)
-Learning rate: 0.001
+```text
+Arquitectura:  [64, 32, 16]
+Learning rate: 0.01
 Dropout:       0.3
 Batch size:    64
 Optimizador:   Adam
-Épocas:        86 (early stopping automático)
-Val F1:        0.9409
-Val AUC:       0.9802
+Val F1:        0.9533
+Val AUC:       0.9881
 ```
 
----
-
-## 7. Resultados del Modelo MLP
-
-### 7.1 Métricas en Test
-
-| Métrica | Valor |
-|---------|-------|
-| Accuracy | 0.92XX |
-| Precision | 0.92XX |
-| Recall | 0.92XX |
-| **F1-Score** | **0.94XX** |
-| **ROC AUC** | **0.98XX** |
-
-*(Valores exactos dependen de la ejecución final)*
-
-### 7.2 Matriz de Confusión
-
-La matriz de confusión muestra la distribución de predicciones correctas e incorrectas, permitiendo analizar los tipos de errores (falsos positivos vs. falsos negativos).
-
-### 7.3 Curvas de Aprendizaje
-
-Se grafican las curvas de pérdida (loss) y accuracy para entrenamiento y validación, permitiendo visualizar:
-- Convergencia del modelo
-- Posible overfitting (gap train/val)
-- Época óptima (donde se detuvo el early stopping)
+La configuracion ganadora en validacion no es la arquitectura base original con dropout 0.4, sino la mejor combinacion encontrada en el grid: dropout 0.3, Adam, batch 64 y learning rate 0.01.
 
 ---
 
-## 8. Comparación con Modelos de Ciencia de Datos
+## 7. Resultados del MLP
 
-### 8.1 Modelos Tradicionales Entrenados en CD
+### 7.1 Reentrenamiento Final
 
-| Modelo | Accuracy | Precision | Recall | F1-Score | ROC AUC | Tiempo (s) |
-|--------|----------|-----------|--------|----------|---------|------------|
-| Regresión Logística | 0.7988 | 0.8197 | 0.7661 | 0.792 | 0.8914 | 4.6 |
-| Naive Bayes | 0.8461 | 0.8206 | 0.8859 | 0.852 | 0.9043 | 0.06 |
-| KNN (k=3) | 0.9415 | 0.9117 | 0.9777 | 0.9436 | 0.9696 | 0.7 |
-| Árbol de Decisión | 0.9368 | 0.9285 | 0.9465 | 0.9374 | 0.9368 | 1.8 |
-| Random Forest | 0.9505 | 0.9343 | 0.9692 | 0.9514 | 0.9896 | 30.6 |
-| Gradient Boosting | 0.9493 | 0.9369 | 0.9635 | 0.95 | 0.9866 | 34.7 |
-| **MLP (PyTorch)** | ~0.92 | ~0.92 | ~0.92 | **~0.94** | **~0.98** | ~24 |
+Despues del tuning, el notebook reentrena el mejor modelo usando el train exportado y una validacion interna para early stopping. El test permanece reservado hasta el final.
 
-### 8.2 Análisis Comparativo
+| Resultado | Valor |
+|-----------|------:|
+| Mejor epoca final | 59 |
+| Early stopping | Epoca 74 |
+| Tiempo de entrenamiento final | 54.7s |
 
-**Posicionamiento del MLP:**
-- **Iguala o supera** a KNN y Árbol de Decisión
-- **Se acerca** a Random Forest y Gradient Boosting
-- **Supera significativamente** a Regresión Logística y Naive Bayes
+### 7.2 Metricas en Test
 
-**Ventajas del MLP:**
-1. **Capacidad de modelado no lineal**: Puede capturar fronteras de decisión complejas sin ingeniería de features adicional
-2. **Aprendizaje de representaciones**: Cada capa aprende representaciones progresivamente más abstractas
-3. **Escalabilidad**: Puede aprovechar aceleración por GPU para datasets más grandes
-4. **Flexibilidad arquitectónica**: Técnicas como BatchNorm, Dropout, diferentes activaciones
+Valores tomados de la salida actual de `tp_ia.ipynb`.
 
-**Desventajas del MLP:**
-1. Mayor tiempo de entrenamiento respecto a modelos simples
-2. Mayor cantidad de hiperparámetros (requiere más experimentación)
-3. Baja interpretabilidad (problema de "caja negra")
-4. Sensibilidad a la escala de los datos (requiere normalización cuidadosa)
+| Metrica | Valor |
+|---------|------:|
+| Accuracy | 0.9399 |
+| Precision | 0.9192 |
+| Recall | 0.9645 |
+| **F1-Score** | **0.9413** |
+| **ROC AUC** | **0.9865** |
+
+### 7.3 Matriz de Confusion del MLP
+
+| Real \ Predicho | normal | failure |
+|-----------------|-------:|--------:|
+| normal | 1,933 | 179 |
+| failure | 75 | 2,037 |
+
+El MLP prioriza capturar fallas: recall de `failure` = 0.9645. Esto deja 75 falsos negativos sobre 2,112 fallas reales.
+
+### 7.4 Curvas de Aprendizaje
+
+Las curvas de loss y accuracy muestran convergencia con brecha acotada entre entrenamiento y validacion. Early stopping selecciona la epoca con mejor validacion antes de evaluar sobre test.
+
+---
+
+## 8. Comparacion con Modelos Tradicionales de CD
+
+### 8.1 Resultados Exportados por CD
+
+Valores tomados de `resultados_modelos.csv`.
+
+| Modelo | Accuracy | Precision | Recall | F1-Score | ROC AUC |
+|--------|---------:|----------:|-------:|---------:|--------:|
+| Regresion Logistica | 0.8378 | 0.8296 | 0.8504 | 0.8398 | 0.9219 |
+| Naive Bayes | 0.7971 | 0.7577 | 0.8736 | 0.8115 | 0.8847 |
+| KNN | 0.9512 | 0.9243 | **0.9830** | 0.9527 | 0.9754 |
+| Arbol de Decision | 0.9524 | 0.9459 | 0.9598 | 0.9528 | 0.9524 |
+| Random Forest | 0.9664 | 0.9522 | 0.9820 | 0.9669 | 0.9956 |
+| **Gradient Boosting** | **0.9716** | **0.9624** | 0.9815 | **0.9719** | **0.9962** |
+| **MLP (PyTorch)** | 0.9399 | 0.9192 | 0.9645 | 0.9413 | 0.9865 |
+
+### 8.2 Ranking por F1-Score
+
+| Puesto | Modelo | F1-Score |
+|-------:|--------|---------:|
+| 1 | Gradient Boosting | 0.9719 |
+| 2 | Random Forest | 0.9669 |
+| 3 | Arbol de Decision | 0.9528 |
+| 4 | KNN | 0.9527 |
+| 5 | MLP (PyTorch) | 0.9413 |
+| 6 | Regresion Logistica | 0.8398 |
+| 7 | Naive Bayes | 0.8115 |
+
+### 8.3 Analisis Comparativo
+
+| Comparacion | Lectura |
+|-------------|---------|
+| MLP vs modelos lineales/probabilisticos | MLP supera ampliamente a Regresion Logistica y Naive Bayes |
+| MLP vs KNN/Arbol | MLP queda por debajo de KNN y Arbol de Decision en F1 |
+| MLP vs ensembles | Random Forest y Gradient Boosting son superiores |
+| AUC del MLP | 0.9865, muy competitivo aunque no lidera |
+| Recall del MLP | 0.9645, bueno para detectar fallas |
+
+El resultado es consistente con datos tabulares de tamano medio: los ensembles de arboles suelen dominar porque capturan interacciones no lineales y particiones locales sin requerir gran volumen de datos.
+
+### 8.4 Comparacion de Tiempos
+
+| Modelo | Tiempo reportado |
+|--------|-----------------:|
+| Naive Bayes | 0.06s |
+| KNN | 0.7s |
+| Arbol de Decision | 1.8s |
+| Regresion Logistica | 4.6s |
+| Random Forest | 30.6s |
+| Gradient Boosting | 34.7s |
+| MLP (PyTorch) | 54.7s |
+
+El MLP fue mas costoso que los modelos tradicionales reportados. Su ventaja potencial aparece en escenarios con mas datos, GPU o arquitecturas neuronales especializadas.
 
 ---
 
 ## 9. Conclusiones
 
-### 9.1 Conclusiones Técnicas
+### 9.1 Conclusiones Tecnicas
 
-1. **El MLP alcanza resultados competitivos**: F1-Score ~0.94 y AUC ~0.98, comparable con los mejores modelos tradicionales.
+1. El pipeline CD-IA quedo integrado: IA usa `train_data.csv`, `test_data.csv` y `resultados_modelos.csv` exportados por CD.
+2. El cambio de `Normalizer()` a `StandardScaler()` modifica el benchmark y debe considerarse parte central de la version actual.
+3. El MLP alcanza buen rendimiento absoluto: F1 0.9413 y AUC 0.9865.
+4. El MLP no supera a los mejores modelos tradicionales en este dataset: Gradient Boosting lidera con F1 0.9719 y AUC 0.9962.
+5. La mejor configuracion del MLP en la notebook actual usa [64,32,16], learning rate 0.01, dropout 0.3, batch 64 y Adam.
+6. La arquitectura [64,32] queda muy cerca en validacion, por lo que seria una alternativa pragmatica si se prioriza menor complejidad.
 
-2. **El learning rate es el hiperparámetro más impactante**: Una mala elección (0.01) arruina incluso la mejor arquitectura. El valor por defecto de Adam (0.001) funciona óptimamente.
+### 9.2 Conclusiones sobre Integracion CD-IA
 
-3. **Más capas ≠ siempre mejor**: La tercera capa aporta solo +0.36 F1 a cambio de +34% más tiempo. Los rendimientos son decrecientes.
+1. La comparacion es valida porque todos los modelos usan el mismo split exportado.
+2. El test se mantiene como evaluacion final en IA, sin usarlo durante el tuning del MLP.
+3. Los resultados hardcodeados de la presentacion deben tomar como fuentes de verdad `tp_ia.ipynb` para MLP y `resultados_modelos.csv` para modelos CD.
 
-4. **La regularización excesiva es contraproducente**: Dropout 0.5 sobre-regulariza sistemáticamente. Para redes pequeñas, dropout 0.3 es más adecuado.
+### 9.3 Lineas Futuras
 
-5. **El early stopping es esencial**: Ahorró ~60% de tiempo de cómputo en promedio y evitó overfitting.
-
-### 9.2 Conclusiones sobre la Integración CD-IA
-
-1. **El pipeline integrado funciona**: Los datos preprocesados en CD se utilizan directamente en IA, asegurando comparabilidad de resultados.
-
-2. **Modelos tradicionales siguen siendo competitivos**: Para datos tabulares de tamaño medio (~10k muestras), Random Forest y Gradient Boosting siguen siendo difíciles de superar.
-
-3. **El MLP muestra mejor generalización**: Menor gap train/val comparado con Árbol de Decisión simple.
-
-### 9.3 Líneas Futuras de Trabajo
-
-1. **Redes más profundas**: Explorar arquitecturas con Residual Connections
-2. **AutoML**: Utilizar herramientas como Optuna para búsqueda automática de hiperparámetros
-3. **Modelos híbridos**: Combinar con mecanismos de atención (TabNet, TabTransformer)
-4. **Explicabilidad (XAI)**: Aplicar SHAP o LIME para interpretar predicciones
-5. **Series de tiempo**: Si se dispone de datos secuenciales, explorar LSTM/GRU
+1. Ajustar `weight_decay` para combinar L2 con dropout.
+2. Probar scheduler de learning rate, especialmente si se quiere hacer competitivo SGD.
+3. Evaluar modelos neuronales tabulares como TabNet o TabTransformer.
+4. Analizar explicabilidad con SHAP o LIME.
+5. Validar performance por `product_type` para detectar sesgos o dependencia excesiva de la categoria.
+6. Si se dispone de historial temporal, explorar LSTM/GRU o CNN 1D para secuencias de sensores.
 
 ---
 
-## 10. Referencias Bibliográficas
+## 10. Referencias Bibliograficas
 
-- Kingma, D. P., & Ba, J. (2014). Adam: A Method for Stochastic Optimization. *arXiv:1412.6980*
-- Srivastava, N., et al. (2014). Dropout: A Simple Way to Prevent Neural Networks from Overfitting. *JMLR, 15*(1), 1929-1958
-- Bengio, Y. (2012). Practical Recommendations for Gradient-Based Training of Deep Architectures. *Neural Networks: Tricks of the Trade*
-- Goodfellow, I., Bengio, Y., & Courville, A. (2016). *Deep Learning*. MIT Press
-- Masters, D., & Luschi, C. (2018). Revisiting Small Batch Training for Deep Neural Networks. *arXiv:1804.07612*
+- Kingma, D. P., & Ba, J. (2014). Adam: A Method for Stochastic Optimization. *arXiv:1412.6980*.
+- Srivastava, N., et al. (2014). Dropout: A Simple Way to Prevent Neural Networks from Overfitting. *JMLR, 15*(1), 1929-1958.
+- Bengio, Y. (2012). Practical Recommendations for Gradient-Based Training of Deep Architectures. *Neural Networks: Tricks of the Trade*.
+- Goodfellow, I., Bengio, Y., & Courville, A. (2016). *Deep Learning*. MIT Press.
+- Masters, D., & Luschi, C. (2018). Revisiting Small Batch Training for Deep Neural Networks. *arXiv:1804.07612*.
 
 ---
 
-## Anexo: Código y Recursos
+## Anexo: Fuentes Usadas
 
-- **Dataset**: `i40.csv`
-- **Datos preprocesados**: `train_data.csv`, `test_data.csv`
-- **Notebook CD**: `tp_cdd.ipynb`
-- **Notebook IA**: `tp_ia.ipynb`
-- **Análisis de hiperparámetros**: `inciso2_ajuste_hiperparametros.md`
-- **Resultados modelos**: `resultados_modelos.csv`
+| Recurso | Rol |
+|---------|-----|
+| `i40.csv` | Dataset original |
+| `tp_cdd.ipynb` | Pipeline de preprocesamiento y modelos tradicionales |
+| `train_data.csv` | Train exportado para IA |
+| `test_data.csv` | Test exportado para IA |
+| `resultados_modelos.csv` | Metricas exportadas de CD |
+| `tp_ia.ipynb` | Entrenamiento, tuning y evaluacion del MLP |
+| `tp_cdd_reporte.md` | Contexto tecnico de correcciones del pipeline |
