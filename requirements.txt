@@ -7,3 +7,5 @@ imbalanced-learn
 torch
 ipykernel
 jupyter
+pickle
+psutil
