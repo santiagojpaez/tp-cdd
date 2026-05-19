@@ -1,7 +1,7 @@
 Modelo,Memoria_KB
 Regresion Logistica,0.9404296875
 Naive Bayes,0.9892578125
-KNN,766.0322265625
-Arbol de Decision,62.921875
-Random Forest,13449.6240234375
-Gradient Boosting,860.3125
+KNN,766.0654296875
+Arbol de Decision,64.3701171875
+Random Forest,6830.92578125
+Gradient Boosting,798.8779296875

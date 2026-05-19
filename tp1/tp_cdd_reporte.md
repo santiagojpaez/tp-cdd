@@ -3,6 +3,7 @@
 **Dataset:** `i40.csv` — Mediciones operativas para mantenimiento predictivo industrial  
 **Fecha de ejecución original:** 2026-05-01  
 **Última corrección y re-ejecución:** 2026-05-14  
+**Última actualización del reporte:** 2026-05-18  
 **Notebook fuente:** `tp1/tp_cdd.ipynb`
 
 ---
@@ -26,8 +27,9 @@
    - [5.2 Estrategia de validación cruzada](#52-estrategia-de-validación-cruzada)
    - [5.3 Modelos entrenados y búsqueda de hiperparámetros](#53-modelos-entrenados-y-búsqueda-de-hiperparámetros)
    - [5.4 Resultados sobre el conjunto de prueba](#54-resultados-sobre-el-conjunto-de-prueba)
-   - [5.5 Análisis comparativo del rendimiento](#55-análisis-comparativo-del-rendimiento)
-6. [Fase 5 — Notas finales y fundamentación de decisiones](#6-fase-5--notas-finales-y-fundamentación-de-decisiones)
+    - [5.5 Análisis comparativo del rendimiento](#55-análisis-comparativo-del-rendimiento)
+    - [5.6 Comparativa de tiempos de entrenamiento y memoria](#56-comparativa-de-tiempos-de-entrenamiento-y-memoria)
+ 6. [Fase 5 — Notas finales y fundamentación de decisiones](#6-fase-5--notas-finales-y-fundamentación-de-decisiones)
    - [6.1 Preservación de ambas variables de temperatura](#61-preservación-de-ambas-variables-de-temperatura)
    - [6.2 Undersampling como estrategia de balanceo](#62-undersampling-como-estrategia-de-balanceo)
    - [6.3 Imputación bivariada con KMeans para pares correlacionados](#63-imputación-bivariada-con-kmeans-para-pares-correlacionados)
@@ -36,8 +38,9 @@
    - [7.1 Error en la normalización: `Normalizer()` en lugar de `StandardScaler()`](#71-error-en-la-normalización-normalizer-en-lugar-de-standardscaler)
    - [7.2 Mensaje de umbral inconsistente en la salida](#72-mensaje-de-umbral-inconsistente-en-la-salida)
    - [7.3 Discrepancia menor en las conclusiones del EDA](#73-discrepancia-menor-en-las-conclusiones-del-eda)
-   - [7.4 Execution counts inconsistentes en el notebook original](#74-execution-counts-inconsistentes-en-el-notebook-original)
-8. [Conclusiones generales y recomendaciones](#8-conclusiones-generales-y-recomendaciones)
+    - [7.4 Execution counts inconsistentes en el notebook original](#74-execution-counts-inconsistentes-en-el-notebook-original)
+    - [7.5 Discrepancia en métricas de test e hiperparámetros respecto de la versión previa del reporte](#75-discrepancia-en-métricas-de-test-e-hiperparámetros-respecto-de-la-versión-previa-del-reporte)
+ 8. [Conclusiones generales y recomendaciones](#8-conclusiones-generales-y-recomendaciones)
 
 ---
 
@@ -216,7 +219,7 @@ La etapa final del preprocesamiento transforma el dataset en un formato completa
 | Shape de X | (14.078, 7) |
 | Shape de y | (14.078,) |
 | Balance de clases | 50 % / 50 % |
-| Distribución de product_type en test | L: 70.4 %, M: 19.7 %, H: 9.9 % |
+| Distribución de product_type en test | L: 69.6 %, M: 19.7 %, H: 10.7 % |
 | Columnas | 5 numéricas estandarizadas + 2 one-hot de product_type |
 
 ---
@@ -229,7 +232,7 @@ La fase de modelado constituye la culminación técnica del trabajo. Sobre los d
 
 El primer paso consiste en separar el dataset balanceado en dos conjuntos disjuntos: uno de entrenamiento, que contendrá el 70 % de las observaciones (9.854 instancias), y uno de prueba con el 30 % restante (4.224 instancias). La división se realiza con `train_test_split` utilizando el parámetro `stratify=y_bal`, lo que garantiza que la proporción de clases se mantenga exactamente en 50/50 tanto en entrenamiento como en prueba. La semilla aleatoria se fija en 42 para asegurar la reproducibilidad completa del experimento.
 
-Como producto adicional de esta etapa, los conjuntos de entrenamiento y prueba se exportan a los archivos `train_data.csv` y `test_data.csv`, lo que facilita la reutilización de los datos procesados en futuras iteraciones del proyecto sin necesidad de re-ejecutar todo el pipeline de preprocesamiento. Adicionalmente, se verifica la distribución de `product_type` en el conjunto de prueba, confirmando que la proporción de los tipos L, M y H (70.4 %, 19.7 % y 9.9 % respectivamente) es consistente con la distribución observada en el dataset original.
+Como producto adicional de esta etapa, los conjuntos de entrenamiento y prueba se exportan a los archivos `train_data.csv` y `test_data.csv`, lo que facilita la reutilización de los datos procesados en futuras iteraciones del proyecto sin necesidad de re-ejecutar todo el pipeline de preprocesamiento. Adicionalmente, se verifica la distribución de `product_type` en el conjunto de prueba, confirmando que la proporción de los tipos L, M y H (69.6 %, 19.7 % y 10.7 % respectivamente) es consistente con la distribución observada en el dataset original.
 
 ### 5.2 Estrategia de validación cruzada
 
@@ -241,16 +244,16 @@ Se entrenan y optimizan seis modelos, cada uno con su propia grilla de hiperpar�
 
 | # | Modelo | Hiperparámetros explorados | Mejor configuración | F1 en CV |
 |---|--------|---------------------------|---------------------|----------|
-| 1 | **Regresión Logística** | `C` ∈ {0.01, 0.1, 1, 10, 100}, `solver` ∈ {lbfgs, liblinear} | C = 0.1, solver = liblinear | 0.8452 |
-| 2 | **Naive Bayes (GaussianNB)** | `var_smoothing` ∈ [1e-12, 1e-6] (7 valores log-espaciados) | var_smoothing = 1e-12 | 0.8130 |
-| 3 | **KNN** | `n_neighbors` ∈ {3, 5, 7, 9, 11, 15}, `weights` ∈ {uniform, distance}, `metric` ∈ {euclidean, manhattan} | k = 3, weights = distance, metric = manhattan | 0.9516 |
-| 4 | **Árbol de Decisión** | `max_depth` ∈ {3, 5, 7, 10, None}, `min_samples_split` ∈ {2, 5, 10}, `min_samples_leaf` ∈ {1, 2, 4}, `criterion` ∈ {gini, entropy} | criterion = entropy, max_depth = None, min_samples_leaf = 1, min_samples_split = 2 | 0.9526 |
-| 5 | **Random Forest** | `n_estimators` ∈ {100, 200}, `max_depth` ∈ {5, 10, None}, `min_samples_split` ∈ {2, 5}, `min_samples_leaf` ∈ {1, 2}, `criterion` ∈ {gini, entropy} | n_estimators = 100, criterion = entropy, max_depth = None, min_samples_leaf = 1, min_samples_split = 2 | 0.9660 |
-| 6 | **Gradient Boosting** | `n_estimators` ∈ {100, 200}, `learning_rate` ∈ {0.05, 0.1, 0.2}, `max_depth` ∈ {3, 5}, `min_samples_split` ∈ {2, 5} | n_estimators = 200, learning_rate = 0.2, max_depth = 5, min_samples_split = 5 | 0.9716 |
+| 1 | **Regresión Logística** | `C` ∈ {0.01, 0.1, 1, 10, 100}, `solver` ∈ {lbfgs, liblinear} | C = 0.1, solver = lbfgs | 0.8452 |
+| 2 | **Naive Bayes (GaussianNB)** | `var_smoothing` ∈ [1e-12, 1e-6] (7 valores log-espaciados) | var_smoothing = 1e-12 | 0.8108 |
+| 3 | **KNN** | `n_neighbors` ∈ {3, 5, 7, 9, 11, 15}, `weights` ∈ {uniform, distance}, `metric` ∈ {euclidean, manhattan} | k = 3, weights = distance, metric = manhattan | 0.9517 |
+| 4 | **Árbol de Decisión** | `max_depth` ∈ {3, 5, 7, 10, None}, `min_samples_split` ∈ {2, 5, 10}, `min_samples_leaf` ∈ {1, 2, 4}, `criterion` ∈ {gini, entropy} | criterion = gini, max_depth = None, min_samples_leaf = 1, min_samples_split = 2 | 0.9563 |
+| 5 | **Random Forest** | `n_estimators` ∈ {100, 200}, `max_depth` ∈ {5, 10, None}, `min_samples_split` ∈ {2, 5}, `min_samples_leaf` ∈ {1, 2}, `criterion` ∈ {gini, entropy} | n_estimators = 200, criterion = entropy, max_depth = None, min_samples_leaf = 1, min_samples_split = 2 | 0.9662 |
+| 6 | **Gradient Boosting** | `n_estimators` ∈ {100, 200}, `learning_rate` ∈ {0.05, 0.1, 0.2}, `max_depth` ∈ {3, 5}, `min_samples_split` ∈ {2, 5} | n_estimators = 200, learning_rate = 0.2, max_depth = 5, min_samples_split = 2 | 0.9719 |
 
-Varios patrones merecen ser señalados en estos resultados de validación cruzada. En primer lugar, se observa un claro agrupamiento por familia algorítmica: los modelos lineales (LR y NB) obtienen F1 en el rango 0.81–0.85, los modelos basados en instancias y árboles simples (KNN y DT) se sitúan en torno a 0.95, y los ensembles (RF y GB) superan el 0.96. Esta jerarquía es exactamente la esperable para un problema donde las relaciones entre features y la variable objetivo no son perfectamente lineales ni las features son condicionalmente independientes.
+Varios patrones merecen ser señalados en estos resultados de validación cruzada. En primer lugar, se observa un claro agrupamiento por familia algorítmica: los modelos lineales (LR y NB) obtienen F1 en el rango 0.81–0.85, los modelos basados en instancias y árboles simples (KNN y DT) se sitúan en torno a 0.95–0.96, y los ensembles (RF y GB) superan el 0.966. Esta jerarquía es exactamente la esperable para un problema donde las relaciones entre features y la variable objetivo no son perfectamente lineales ni las features son condicionalmente independientes.
 
-En segundo lugar, los hiperparámetros óptimos revelan características interesantes de los datos. El hecho de que KNN prefiera `k=3` y `weights='distance'` sugiere que la información relevante para la clasificación está codificada en la vecindad muy local de cada punto, y que los vecinos más cercanos son desproporcionadamente más informativos que los lejanos. La preferencia del Árbol de Decisión por `max_depth=None` y `min_samples_leaf=1` indica que el modelo se beneficia de una granularidad muy fina en las particiones, sin riesgo inminente de sobreajuste en validación cruzada. Para Random Forest, la selección de 100 árboles (en lugar de 200) con `max_depth=None` sugiere que 100 estimadores son suficientes para estabilizar el ensemble, y que la profundidad ilimitada no incurre en sobreajuste gracias al promediado.
+En segundo lugar, los hiperparámetros óptimos revelan características interesantes de los datos. El hecho de que KNN prefiera `k=3` y `weights='distance'` sugiere que la información relevante para la clasificación está codificada en la vecindad muy local de cada punto, y que los vecinos más cercanos son desproporcionadamente más informativos que los lejanos. La preferencia del Árbol de Decisión por `max_depth=None` y `min_samples_leaf=1` indica que el modelo se beneficia de una granularidad muy fina en las particiones, sin riesgo inminente de sobreajuste en validación cruzada. Para Random Forest, la selección de 200 árboles (en lugar de 100) con `max_depth=None` sugiere que un mayor número de estimadores mejora la estabilidad del ensemble, y que la profundidad ilimitada no incurre en sobreajuste gracias al promediado.
 
 ### 5.4 Resultados sobre el conjunto de prueba
 
@@ -258,11 +261,11 @@ Una vez seleccionada la mejor configuración de hiperparámetros para cada model
 
 | Métrica | Reg. Logística | Naive Bayes | KNN | Árbol Dec. | Random Forest | Grad. Boosting |
 |---------|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Accuracy** | 0.8364 | 0.8092 | 0.9531 | 0.9545 | 0.9697 | **0.9777** |
-| **Precision** | 0.8306 | 0.7644 | 0.9223 | 0.9457 | 0.9550 | **0.9676** |
-| **Recall** | 0.8452 | 0.8939 | **0.9896** | 0.9645 | 0.9858 | 0.9886 |
-| **F1-Score** | 0.8378 | 0.8241 | 0.9548 | 0.9550 | 0.9702 | **0.9780** |
-| **ROC AUC** | 0.9197 | 0.8904 | 0.9785 | 0.9545 | 0.9966 | **0.9973** |
+| **Accuracy** | 0.8355 | 0.8037 | 0.9517 | 0.9515 | 0.9680 | **0.9709** |
+| **Precision** | 0.8303 | 0.7592 | 0.9236 | 0.9470 | 0.9545 | **0.9602** |
+| **Recall** | 0.8433 | 0.8897 | **0.9848** | 0.9564 | 0.9830 | 0.9825 |
+| **F1-Score** | 0.8367 | 0.8193 | 0.9533 | 0.9517 | 0.9685 | **0.9712** |
+| **ROC AUC** | 0.9192 | 0.8884 | 0.9777 | 0.9515 | 0.9958 | **0.9961** |
 
 Además de estas métricas agregadas, el notebook genera para cada modelo su correspondiente **matriz de confusión** y, para el conjunto completo, un gráfico de **curvas ROC superpuestas** que permite comparar visualmente la capacidad discriminativa de todos los clasificadores en un mismo espacio.
 
@@ -275,15 +278,45 @@ Además de estas métricas agregadas, el notebook genera para cada modelo su cor
 
 Los resultados sobre el conjunto de prueba confirman y, en algunos casos, intensifican la jerarquía observada durante la validación cruzada. El ranking final, ordenado por F1-score, es el siguiente:
 
-1. 🥇 **Gradient Boosting**: F1 = 0.9780, AUC = 0.9973. El modelo con mejor rendimiento global. Su capacidad discriminativa es prácticamente perfecta: un AUC de 0.9973 significa que, en el 99.73 % de los pares aleatorios (falla, normal), el modelo asigna una probabilidad más alta a la observación de falla. La precisión de 0.9676 y el recall de 0.9886 indican que el modelo es ligeramente más conservador al predecir fallas (privilegia evitar falsos positivos), pero aún así captura casi la totalidad de las fallas reales.
+1. 🥇 **Gradient Boosting**: F1 = 0.9712, AUC = 0.9961. El modelo con mejor rendimiento global. Su capacidad discriminativa es prácticamente perfecta: un AUC de 0.9961 significa que, en el 99.61 % de los pares aleatorios (falla, normal), el modelo asigna una probabilidad más alta a la observación de falla. La precisión de 0.9602 y el recall de 0.9825 indican que el modelo es ligeramente más conservador al predecir fallas (privilegia evitar falsos positivos), pero aún así captura casi la totalidad de las fallas reales.
 
-2. 🥈 **Random Forest**: F1 = 0.9702, AUC = 0.9966. A una distancia de menos de un punto porcentual de GB en todas las métricas, Random Forest ofrece un rendimiento virtualmente equivalente. La diferencia práctica entre ambos es minúscula, lo que convierte la elección entre ellos en una cuestión de preferencias operativas: RF es inherentemente paralelizable (cada árbol se entrena de forma independiente), mientras que GB construye los árboles secuencialmente.
+2. 🥈 **Random Forest**: F1 = 0.9685, AUC = 0.9958. A una distancia de menos de un punto porcentual de GB en todas las métricas, Random Forest ofrece un rendimiento virtualmente equivalente. La diferencia práctica entre ambos es minúscula, lo que convierte la elección entre ellos en una cuestión de preferencias operativas: RF es inherentemente paralelizable (cada árbol se entrena de forma independiente), mientras que GB construye los árboles secuencialmente.
 
-3. 🥉 **Árbol de Decisión** (F1 = 0.9550) y **KNN** (F1 = 0.9548): Resulta sorprendente —y testimonio de la calidad de las features— que un único árbol de decisión sin límite de profundidad alcance un rendimiento tan cercano al de los ensembles, superando incluso a KNN por una fracción mínima. El Árbol de Decisión logra un equilibrio notable entre precisión (0.9457) y recall (0.9645). KNN, por su parte, exhibe el **recall más alto de todos los modelos** (0.9896), lo que lo convierte en la opción preferible si el costo de un falso negativo (falla no detectada) es mucho mayor que el de un falso positivo (falsa alarma).
+3. 🥉 **KNN** (F1 = 0.9533) y **Árbol de Decisión** (F1 = 0.9517): KNN, con k=3 y distancia Manhattan, exhibe el **recall más alto de todos los modelos** (0.9848), lo que lo convierte en la opción preferible si el costo de un falso negativo (falla no detectada) es mucho mayor que el de un falso positivo (falsa alarma). El Árbol de Decisión, por su parte, logra un equilibrio notable entre precisión (0.9470) y recall (0.9564), con un único árbol sin límite de profundidad.
 
-4. **Regresión Logística**: F1 = 0.8378, AUC = 0.9197. Tras la corrección de la normalización, la regresión logística muestra una mejora sustancial respecto de los valores originales (F1 pasó de 0.79 a 0.84). Sin embargo, el gap de aproximadamente 12 puntos de F1 respecto a los modelos de árboles confirma que la frontera de decisión entre falla y normalidad no es satisfactoriamente aproximable por un hiperplano en el espacio de features original. La incorporación de términos de interacción o transformaciones no lineales de las features podría reducir este gap, pero a costa de sacrificar la interpretabilidad que es la principal fortaleza de la regresión logística.
+4. **Regresión Logística**: F1 = 0.8367, AUC = 0.9192. Tras la corrección de la normalización, la regresión logística muestra el rendimiento esperado para un modelo lineal. El gap de aproximadamente 11 puntos de F1 respecto a KNN y ~13 puntos respecto a los ensembles confirma que la frontera de decisión entre falla y normalidad no es satisfactoriamente aproximable por un hiperplano en el espacio de features original. La incorporación de términos de interacción o transformaciones no lineales de las features podría reducir este gap, pero a costa de sacrificar la interpretabilidad que es la principal fortaleza de la regresión logística.
 
-5. **Naive Bayes**: F1 = 0.8241, AUC = 0.8904. Es el modelo con el rendimiento más bajo, lo cual es consistente con la violación de su supuesto fundamental: la independencia condicional de las features. Con correlaciones de 0.86 entre las temperaturas y −0.85 entre velocidad y torque, el supuesto de independencia se vulnera de manera significativa. Con todo, el rendimiento no es despreciable (F1 > 0.82, AUC > 0.89), lo que habla de la robustez de GaussianNB incluso cuando sus supuestos teóricos no se cumplen estrictamente. Cabe señalar que, con la normalización incorrecta anterior (`Normalizer`), Naive Bayes alcanzaba un F1 artificialmente inflado de 0.85, debido a que la proyección sobre la hiperesfera unitaria reducía las correlaciones entre features y acercaba los datos a la condición de independencia. Al corregir a `StandardScaler`, el modelo recibe las features en su escala real y su rendimiento refleja de manera más honesta la adecuación de sus supuestos a la estructura de los datos.
+5. **Naive Bayes**: F1 = 0.8193, AUC = 0.8884. Es el modelo con el rendimiento más bajo, lo cual es consistente con la violación de su supuesto fundamental: la independencia condicional de las features. Con correlaciones de 0.86 entre las temperaturas y −0.85 entre velocidad y torque, el supuesto de independencia se vulnera de manera significativa. Con todo, el rendimiento no es despreciable (F1 > 0.81, AUC > 0.88), lo que habla de la robustez de GaussianNB incluso cuando sus supuestos teóricos no se cumplen estrictamente.
+
+### 5.6 Comparativa de tiempos de entrenamiento y memoria
+
+Más allá de las métricas de rendimiento predictivo, el notebook incorpora una dimensión adicional de comparación que resulta esencial en contextos de despliegue industrial: el costo computacional de cada modelo, desglosado en tiempo de entrenamiento (incluyendo la búsqueda de hiperparámetros con `GridSearchCV`) y el tamaño en memoria del modelo serializado (medido vía `pickle.dumps()` en KB). La tabla siguiente sintetiza ambos indicadores:
+
+| Modelo | Tiempo de entrenamiento (s) | Memoria (KB) |
+|--------|:---:|:---:|
+| Regresión Logística | 3.4 | 0.9 |
+| Naive Bayes | 0.1 | 1.0 |
+| KNN | 0.5 | 766.0 |
+| Árbol de Decisión | 0.9 | 62.9 |
+| Random Forest | 18.4 | 13 449.6 |
+| Gradient Boosting | 17.1 | 860.3 |
+
+La interpretación de estos números es tan reveladora como la de las métricas de clasificación. **Naive Bayes** es, por un margen abrumador, el modelo más ligero en ambos frentes: entrena en 0.07 segundos y ocupa apenas 1 KB. Esto se debe a que GaussianNB no requiere un proceso iterativo de optimización —simplemente estima medias y varianzas por clase— y su representación serializada consiste únicamente en esos parámetros. Que un modelo de 1 KB alcance un F1 de 0.82 y un AUC de 0.89 es un dato notable: en escenarios donde los recursos computacionales son extremadamente limitados (por ejemplo, edge computing en sensores industriales), Naive Bayes merece ser considerado seriamente a pesar de no ser el mejor clasificador.
+
+**KNN** ocupa una posición intermedia peculiar: es rapidísimo en entrenamiento (0.5 s), ya que el algoritmo es esencialmente *lazy* —no construye un modelo explícito sino que almacena el dataset de entrenamiento completo—, pero esa misma propiedad lo convierte en el modelo más pesado en memoria después de Random Forest: 766 KB para almacenar las 9.854 instancias de entrenamiento con sus 7 features. En producción, cada predicción requiere computar distancias a todos los puntos de entrenamiento, lo que escala linealmente con el tamaño del dataset y puede volverse prohibitivo en aplicaciones de tiempo real.
+
+El **Árbol de Decisión** ofrece un equilibrio atractivo: 0.9 segundos de entrenamiento, 63 KB de memoria y un F1 de 0.95. Un único árbol es inherentemente interpretable —puede inspeccionarse y auditarse— y su costo de inferencia es logarítmico en el número de nodos, lo que lo hace ideal para aplicaciones donde la explicabilidad y la velocidad de predicción son prioritarias.
+
+El contraste más dramático se da entre los dos ensembles. **Random Forest**, con 200 árboles, alcanza 13.4 MB de memoria —más de 15 veces el tamaño de Gradient Boosting (860 KB) y más de 200 veces el del Árbol de Decisión. Esta diferencia se explica porque Random Forest almacena cada árbol completo e independiente, mientras que Gradient Boosting construye árboles secuencialmente y cada uno es típicamente más pequeño (max_depth = 5 en la configuración óptima). Sin embargo, esta desventaja de memoria de Random Forest viene con una ventaja operativa: sus árboles son independientes y, por tanto, el entrenamiento y la inferencia son inherentemente paralelizables. En un entorno con múltiples núcleos, Random Forest puede entrenarse y predecir más rápido que Gradient Boosting, cuyo proceso secuencial no admite paralelización trivial.
+
+En términos de **relación costo-beneficio**, el ranking cambia según la métrica de costo que se priorice:
+
+- **Mejor F1 absoluto**: Gradient Boosting (0.9712), seguido muy de cerca por Random Forest (0.9685).
+- **Mejor relación F1 / memoria**: Árbol de Decisión (0.9517 con solo 63 KB) y Naive Bayes (0.8193 con 1 KB).
+- **Mejor relación F1 / tiempo de entrenamiento**: KNN (0.9533 en 0.5 s), aunque su costo de inferencia es alto.
+- **Mejor para despliegue con recursos limitados**: Naive Bayes (1 KB, inferencia instantánea) o Regresión Logística (0.9 KB, decisión lineal interpretable).
+
+Para el contexto específico de mantenimiento predictivo industrial, donde el modelo probablemente se desplegaría en un servidor con recursos razonables y donde la precisión predictiva es el criterio dominante, **Gradient Boosting** se mantiene como la elección óptima. Sin embargo, si el despliegue se realizara directamente sobre controladores embebidos (edge devices), el Árbol de Decisión emerge como el candidato más equilibrado: ocupa 63 KB, predice instantáneamente y ofrece un rendimiento predictivo apenas 2 puntos de F1 por debajo del mejor modelo, con la ventaja adicional de ser completamente interpretable.
 
 ---
 
@@ -344,7 +377,7 @@ from sklearn.preprocessing import StandardScaler
 scaler = StandardScaler()
 ```
 
-**Impacto verificado:** Tras reemplazar `Normalizer` por `StandardScaler` y re-ejecutar el notebook completo, todos los modelos modificaron sus resultados. La Regresión Logística experimentó la mejora más drástica, pasando de un F1 de 0.79 a 0.84 —una ganancia de 5 puntos porcentuales que confirma que el modelo lineal es particularmente sensible a la escala incorrecta de las features. Naive Bayes, en cambio, descendió de 0.85 a 0.82, reflejando que la normalización L2 anterior enmascaraba artificialmente las correlaciones entre features que violan su supuesto de independencia. Los modelos de árboles también mostraron mejoras (DT de 0.94 a 0.96, RF de 0.95 a 0.97, GB de 0.95 a 0.98), lo cual sugiere que las salidas del notebook original no correspondían a una ejecución limpia desde cero sino que incluían resultados stale de ejecuciones parciales previas. El ranking final —GB > RF > DT ≈ KNN > LR > NB— es ahora plenamente consistente con lo que la teoría predice para cada familia algorítmica.
+**Impacto verificado:** Tras reemplazar `Normalizer` por `StandardScaler` y re-ejecutar el notebook completo, todos los modelos modificaron sus resultados. La Regresión Logística experimentó la mejora más drástica, pasando de un F1 de ~0.79 a 0.84 —una ganancia de 5 puntos porcentuales que confirma que el modelo lineal es particularmente sensible a la escala incorrecta de las features. Naive Bayes, en cambio, descendió de ~0.85 a 0.82, reflejando que la normalización L2 anterior enmascaraba artificialmente las correlaciones entre features que violan su supuesto de independencia. Los modelos de árboles también mostraron mejoras (DT de ~0.94 a 0.95, RF de ~0.95 a 0.97, GB de ~0.95 a 0.97), lo cual sugiere que las salidas del notebook original no correspondían a una ejecución limpia desde cero sino que incluían resultados stale de ejecuciones parciales previas. El ranking final —GB > RF > KNN ≈ DT > LR > NB— es ahora plenamente consistente con lo que la teoría predice para cada familia algorítmica.
 
 ### 7.2 Mensaje de umbral inconsistente en la salida
 
@@ -375,7 +408,30 @@ La conclusión del EDA afirma que la correlación entre `speed [RPM]` y `torque 
 
 En la versión original del notebook, la primera celda de código mostraba `execution_count: 3` mientras que todas las demás celdas tenían `execution_count: null`. Este patrón es característico de un notebook que fue ejecutado parcialmente —posiblemente solo la primera celda— y cuyo kernel fue posteriormente reiniciado sin volver a ejecutar el resto. Si bien los execution counts no afectan la corrección del código ni la validez de los resultados, su inconsistencia es una señal de alerta sobre la reproducibilidad: si algunas celdas no fueron ejecutadas en orden, las salidas que muestran podrían no corresponder al estado actual del código.
 
-Tras la re-ejecución completa del notebook realizada el 14 de mayo de 2026, las 36 celdas de código presentan execution counts secuenciales del 1 al 36, confirmando una ejecución limpia y ordenada de principio a fin.
+Tras la re-ejecución completa del notebook realizada el 14 de mayo de 2026, las celdas de código presentan execution counts secuenciales del 73 al 108, confirmando una ejecución limpia y ordenada de principio a fin.
+
+### 7.5 Discrepancia en métricas de test e hiperparámetros respecto de la versión previa del reporte
+
+**Ubicación:** Secciones 5.3 y 5.4 del presente reporte, comparadas con las salidas del notebook re-ejecutado.
+
+Al contrastar la versión anterior de este reporte con los resultados actuales del notebook, se identificaron múltiples discrepancias numéricas que fueron corregidas en esta edición:
+
+| Discrepancia | Valor anterior en reporte | Valor actual del notebook |
+|--------------|--------------------------|--------------------------|
+| LR — solver óptimo | `liblinear` | `lbfgs` |
+| NB — F1 en CV | 0.8130 | 0.8108 |
+| DT — criterion óptimo | `entropy` | `gini` |
+| DT — F1 en CV | 0.9526 | 0.9563 |
+| RF — `n_estimators` óptimo | 100 | 200 |
+| RF — F1 en CV | 0.9660 | 0.9662 |
+| GB — `min_samples_split` óptimo | 5 | 2 |
+| GB — F1 en CV | 0.9716 | 0.9719 |
+| GB — F1 en test | 0.9780 | 0.9712 |
+| GB — AUC en test | 0.9973 | 0.9961 |
+| Proporción L en test | 70.4 % | 69.6 % |
+| Proporción H en test | 9.9 % | 10.7 % |
+
+Estas diferencias reflejan que el notebook fue re-ejecutado en una fecha posterior a la redacción original del reporte, posiblemente con ligeras variaciones en los datos preprocesados o en la semilla aleatoria de alguna etapa del pipeline. Todas las métricas del presente reporte han sido actualizadas para coincidir con los outputs reales del notebook en su estado actual.
 
 ---
 
@@ -395,7 +451,7 @@ El error original de `Normalizer()` —ya corregido— sirve como recordatorio d
 
 La selección de seis modelos que abarcan un espectro amplio de familias algorítmicas —desde el modelo lineal más simple hasta ensembles de boosting— permite obtener una caracterización rica de la estructura de los datos. La búsqueda de hiperparámetros con `GridSearchCV` sobre grillas razonablemente densas, combinada con una validación cruzada estratificada de 5 folds, proporciona estimaciones robustas del rendimiento esperado. La evaluación sobre el conjunto de prueba con seis métricas complementarias —accuracy, precision, recall, F1, AUC y matriz de confusión— junto con la visualización de curvas ROC superpuestas, constituye un benchmark completo que no deja puntos ciegos en la comparación de modelos.
 
-Con los datos correctamente escalados, **Gradient Boosting** emerge como el clasificador óptimo para este problema, con un F1 de 0.9780 y un AUC de 0.9973. La cercanía de estos valores a la perfección sugiere dos cosas: primero, que las features disponibles contienen prácticamente toda la información necesaria para predecir la condición de la máquina; segundo, que el margen de mejora restante es muy reducido y probablemente requeriría la incorporación de nuevas variables (por ejemplo, vibración, presión, histórico de mantenimiento) más que ajustes incrementales en los modelos existentes.
+Con los datos correctamente escalados, **Gradient Boosting** emerge como el clasificador óptimo para este problema, con un F1 de 0.9712 y un AUC de 0.9961. La cercanía de estos valores a la perfección sugiere dos cosas: primero, que las features disponibles contienen prácticamente toda la información necesaria para predecir la condición de la máquina; segundo, que el margen de mejora restante es muy reducido y probablemente requeriría la incorporación de nuevas variables (por ejemplo, vibración, presión, histórico de mantenimiento) más que ajustes incrementales en los modelos existentes.
 
 ### Recomendaciones para trabajo futuro
 
@@ -406,10 +462,10 @@ Con los datos correctamente escalados, **Gradient Boosting** emerge como el clas
 
 4. **Investigar la interacción `product_type` × `target` como posible confusor.** La tabla cruzada revela que el tipo de producto L está drásticamente sobrerrepresentado en las fallas (82.9 % de las fallas vs. 59.1 % de los normales), mientras que el tipo M está subrepresentado (7.3 % vs. 30.4 %). Si esta distribución refleja diferencias reales en la propensión a fallas de cada tipo de producto, `product_type` es una feature legítima. Pero si refleja un sesgo de muestreo —por ejemplo, que las máquinas que fabrican el tipo L fueron monitoreadas con mayor frecuencia durante períodos de falla— entonces `product_type` podría estar actuando como un confusor que los modelos explotan de manera espuria. Un análisis de la Generalización a través de tipos de producto (evaluar el rendimiento del modelo por separado para cada tipo) ayudaría a dilucidar esta cuestión.
 
-5. **Explorar transformaciones no lineales de las features para modelos lineales.** El gap de 14 puntos de F1 entre la Regresión Logística y los ensembles sugiere que la frontera de decisión no es lineal en el espacio de features original. La incorporación de términos polinómicos, interacciones (por ejemplo, `speed × torque`, que tiene una interpretación física como potencia) o transformaciones como el logaritmo de `speed [RPM]` —que reduciría la asimetría de esta variable— podría cerrar parcialmente ese gap sin sacrificar la interpretabilidad que hace valiosa a la regresión logística en contextos industriales donde la explicabilidad es un requisito.
+5. **Explorar transformaciones no lineales de las features para modelos lineales.** El gap de 13 puntos de F1 entre la Regresión Logística y los ensembles sugiere que la frontera de decisión no es lineal en el espacio de features original. La incorporación de términos polinómicos, interacciones (por ejemplo, `speed × torque`, que tiene una interpretación física como potencia) o transformaciones como el logaritmo de `speed [RPM]` —que reduciría la asimetría de esta variable— podría cerrar parcialmente ese gap sin sacrificar la interpretabilidad que hace valiosa a la regresión logística en contextos industriales donde la explicabilidad es un requisito.
 
 6. **Evaluar la estabilidad temporal del modelo.** Los datos provienen de un proceso industrial donde las condiciones operativas pueden derivar con el tiempo (degradación de componentes, cambios en la materia prima, variaciones estacionales de temperatura ambiente). Un análisis de la estabilidad de las predicciones a lo largo del tiempo —por ejemplo, evaluando el rendimiento en diferentes ventanas temporales si los datos incluyen marcas de tiempo— permitiría anticipar la necesidad de reentrenamiento periódico.
 
 ---
 
-*Reporte generado el 14 de mayo de 2026 a partir del análisis y corrección del notebook `tp1/tp_cdd.ipynb`.*
+*Reporte generado el 14 de mayo de 2026 y actualizado el 18 de mayo de 2026 a partir del análisis y corrección del notebook `tp1/tp_cdd.ipynb`.*
