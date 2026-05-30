@@ -1,0 +1,9 @@
+Modelo,Vectorización,Accuracy,Precision (w),Recall (w),F1 (weighted),F1 (macro),Tiempo (s),Best Params
+Logistic Regression,Bag of Words,0.8604,0.8683,0.8604,0.8616,0.8615,11.4,"{'C': 10, 'solver': 'lbfgs'}"
+Multinomial NB,Bag of Words,0.841,0.8482,0.841,0.8407,0.8406,1.6,{'alpha': 0.1}
+Random Forest,Bag of Words,0.8448,0.8545,0.8448,0.8456,0.8456,26.5,"{'max_depth': None, 'min_samples_split': 5, 'n_estimators': 100}"
+Gradient Boosting,Bag of Words,0.8377,0.8459,0.8377,0.8381,0.8381,554.7,"{'learning_rate': 0.1, 'max_depth': 3, 'n_estimators': 200}"
+Logistic Regression,TF-IDF,0.9068,0.9096,0.9068,0.9071,0.907,5.7,"{'C': 10, 'solver': 'lbfgs'}"
+Multinomial NB,TF-IDF,0.8873,0.8901,0.8873,0.8869,0.8868,2.3,{'alpha': 0.1}
+Random Forest,TF-IDF,0.8955,0.8982,0.8955,0.895,0.8949,35.5,"{'max_depth': None, 'min_samples_split': 2, 'n_estimators': 200}"
+Gradient Boosting,TF-IDF,0.8196,0.8359,0.8196,0.824,0.8239,881.2,"{'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 200}"

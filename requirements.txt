@@ -9,3 +9,5 @@ ipykernel
 jupyter
 pickle
 psutil
+wordcloud
+nltk
