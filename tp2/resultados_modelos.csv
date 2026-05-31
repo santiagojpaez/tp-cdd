@@ -1,10 +1,10 @@
 Modelo,Vectorización,Accuracy,Precision (w),Recall (w),F1 (weighted),F1 (macro),Tiempo (s),Best Params
 Logistic Regression,Bag of Words,0.8604,0.8683,0.8604,0.8616,0.8615,9.4,"{'C': 10, 'solver': 'lbfgs'}"
-Multinomial NB,Bag of Words,0.841,0.8482,0.841,0.8407,0.8406,3.7,{'alpha': 0.1}
-Random Forest,Bag of Words,0.8448,0.8545,0.8448,0.8456,0.8456,28.2,"{'max_depth': None, 'min_samples_split': 5, 'n_estimators': 100}"
-Logistic Regression,TF-IDF,0.9068,0.9096,0.9068,0.9071,0.907,4.1,"{'C': 10, 'solver': 'lbfgs'}"
-Multinomial NB,TF-IDF,0.8873,0.8901,0.8873,0.8869,0.8868,0.1,{'alpha': 0.1}
-Random Forest,TF-IDF,0.8955,0.8982,0.8955,0.895,0.8949,35.9,"{'max_depth': None, 'min_samples_split': 2, 'n_estimators': 200}"
-Logistic Regression,Embeddings,0.9422,0.944,0.9422,0.9423,0.9423,3.7,"{'C': 10, 'solver': 'lbfgs'}"
-Gaussian NB,Embeddings,0.8858,0.893,0.8858,0.8865,0.8865,1.6,{'var_smoothing': 1e-12}
-Random Forest,Embeddings,0.9367,0.9381,0.9367,0.9365,0.9365,152.5,"{'max_depth': 30, 'min_samples_split': 2, 'n_estimators': 200}"
+Naive Bayes,Bag of Words,0.841,0.8482,0.841,0.8407,0.8406,3.8,{'alpha': 0.1}
+Random Forest,Bag of Words,0.8448,0.8545,0.8448,0.8456,0.8456,27.3,"{'max_depth': None, 'min_samples_split': 5, 'n_estimators': 100}"
+Logistic Regression,TF-IDF,0.9068,0.9096,0.9068,0.9071,0.907,4.0,"{'C': 10, 'solver': 'lbfgs'}"
+Naive Bayes,TF-IDF,0.8873,0.8901,0.8873,0.8869,0.8868,0.1,{'alpha': 0.1}
+Random Forest,TF-IDF,0.8955,0.8982,0.8955,0.895,0.8949,35.3,"{'max_depth': None, 'min_samples_split': 2, 'n_estimators': 200}"
+Logistic Regression,Embeddings,0.9422,0.944,0.9422,0.9423,0.9423,3.6,"{'C': 10, 'solver': 'lbfgs'}"
+Naive Bayes,Embeddings,0.8858,0.893,0.8858,0.8865,0.8865,1.5,{'var_smoothing': 1e-12}
+Random Forest,Embeddings,0.9367,0.9381,0.9367,0.9365,0.9365,150.1,"{'max_depth': 30, 'min_samples_split': 2, 'n_estimators': 200}"

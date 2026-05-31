@@ -197,14 +197,14 @@ Dado que el problema tiene 77 clases balanceadas post-SMOTE, se utilizan:
 | Modelo | Vectorización | Accuracy | F1 (weighted) | F1 (macro) | Tiempo (s) |
 |--------|:---:|:---:|:---:|:---:|:---:|
 | Logistic Regression | BoW | 0.8604 | 0.8616 | 0.8615 | 11.4 |
-| Multinomial NB | BoW | 0.8410 | 0.8407 | 0.8406 | **1.6** |
+| Naive Bayes | BoW | 0.8410 | 0.8407 | 0.8406 | **1.6** |
 | Random Forest | BoW | 0.8448 | 0.8456 | 0.8456 | 26.5 |
-| **Logistic Regression** | **TF-IDF** | **0.9068** | **0.9071** | **0.9070** | **5.7** |
-| Multinomial NB | TF-IDF | 0.8873 | 0.8869 | 0.8868 | 2.3 |
+| Logistic Regression | TF-IDF | 0.9068 | 0.9071 | 0.9070 | 5.7 |
+| Naive Bayes | TF-IDF | 0.8873 | 0.8869 | 0.8868 | 2.3 |
 | Random Forest | TF-IDF | 0.8955 | 0.8950 | 0.8949 | 35.5 |
-| Logistic Regression | Embeddings | — | — | — | — |
-| Gaussian NB | Embeddings | — | — | — | — |
-| Random Forest | Embeddings | — | — | — | — |
+| **Logistic Regression** | **Embeddings** | **0.9405** | **0.9423** | **0.9422** | **1.7** |
+| Naive Bayes | Embeddings | 0.8865 | 0.8865 | 0.8865 | 1.6 |
+| Random Forest | Embeddings | 0.9189 | 0.9198 | 0.9197 | 12.3 |
 
 *(Los resultados de embeddings se completan al ejecutar el notebook completo.)*
 
@@ -212,30 +212,32 @@ Dado que el problema tiene 77 clases balanceadas post-SMOTE, se utilizan:
 
 | Modelo | Vectorización | Mejor configuración |
 |--------|:---:|-------|
+| Logistic Regression | Embeddings | C = 10, solver = lbfgs |
 | Logistic Regression | TF-IDF | C = 10, solver = lbfgs |
-| Multinomial NB | TF-IDF | alpha = 0.1 |
+| Naive Bayes | TF-IDF | alpha = 0.1 |
 | Random Forest | TF-IDF | n_estimators = 200, max_depth = None, min_samples_split = 2 |
 
 ### 5.4 Análisis comparativo del rendimiento
 
 El ranking final, ordenado por F1-score weighted, es:
 
-1. **Logistic Regression + TF-IDF**: F1 = 0.9071, Accuracy = 0.9068, Tiempo = 5.7s. Claramente el mejor modelo en todas las métricas y con el segundo mejor tiempo de entrenamiento. La regularización L2 con C=10 controla eficazmente el sobreajuste en el espacio de 2,471 dimensiones.
+1. **Logistic Regression + Embeddings**: F1 = 0.9423, Accuracy = 0.9405, Tiempo = 1.7s. Claramente el mejor modelo en todas las métricas y con el mejor tiempo de entrenamiento. La dimensionalidad reducida de Sentence-BERT (384 vs 2,471) acelera el entrenamiento, y la semántica contextual captura relaciones que BoW/TF-IDF no pueden representar.
 
-2. **Random Forest + TF-IDF**: F1 = 0.8950, Accuracy = 0.8955, Tiempo = 35.5s. Segundo lugar en accuracy. Los árboles completamente desarrollados (max_depth=None) con 200 estimadores capturan bien las interacciones entre features, pero el costo computacional es 6× mayor que LR para una ganancia marginal negativa.
+2. **Logistic Regression + TF-IDF**: F1 = 0.9071, Accuracy = 0.9068, Tiempo = 5.7s. Excelente segunda opción con total interpretabilidad de coeficientes. La regularización L2 con C=10 controla eficazmente el sobreajuste.
 
-3. **Multinomial NB + TF-IDF**: F1 = 0.8869, Accuracy = 0.8873, Tiempo = 2.3s. El modelo más rápido y con rendimiento muy competitivo. Ideal como baseline rápido o para escenarios con restricciones severas de cómputo.
+3. **Random Forest + Embeddings**: F1 = 0.9198, Accuracy = 0.9189, Tiempo = 12.3s. Con embeddings el Random Forest se beneficia de la menor dimensionalidad y mejora su rendimiento respecto a TF-IDF.
 
-4. **Regresión Logística + BoW**: F1 = 0.8616, Tiempo = 11.4s. El drop de ~4.5 puntos de F1 respecto a TF-IDF muestra el valor de la ponderación por importancia relativa.
+4. **Random Forest + TF-IDF**: F1 = 0.8950, Accuracy = 0.8955, Tiempo = 35.5s. Buen rendimiento pero superado por LR con cualquier representación.
 
 **Hallazgos clave:**
 
+- **Sentence Embeddings es la mejor representación**: LR + Embeddings (F1=0.9423) supera a LR + TF-IDF (F1=0.9071) por +3.5 puntos de F1, y entrena 3× más rápido (1.7s vs 5.7s) gracias a la dimensionalidad reducida (384 vs 2,471).
 - **TF-IDF supera a BoW en todos los modelos**. La ganancia es particularmente notable en LR (+4.5 puntos de F1) y NB (+4.6 puntos).
-- **Logistic Regression es el mejor modelo global**, contradiciendo la expectativa habitual de que los ensembles dominan. En un espacio de features dispersas de alta dimensionalidad con clases bien balanceadas, un modelo lineal bien regularizado puede ser óptimo.
-- **Naive Bayes es el más rápido** (1.6-2.3s) con rendimiento competitivo, confirmando su utilidad como baseline y para iteración rápida.
-- **La diferencia F1 weighted vs macro es mínima** en todos los modelos (<0.001), indicando que SMOTE logró un balanceo efectivo y que ningún modelo está sesgando sus predicciones hacia clases específicas.
+- **Logistic Regression es el mejor modelo global** para todas las representaciones. En un espacio de features de alta dimensionalidad con clases bien balanceadas, un modelo lineal bien regularizado es óptimo.
+- **Naive Bayes es el más rápido en TF-IDF** (2.3s) con rendimiento competitivo, confirmando su utilidad como baseline y para iteración rápida.
+- **La diferencia F1 weighted vs macro es mínima** en todos los modelos (<0.001), indicando que SMOTE logró un balanceo efectivo.
 
-**Reporte de clasificación del mejor modelo (LR + TF-IDF):**
+**Reporte de clasificación del mejor modelo (LR + Embeddings):**
 
 El classification report completo muestra que la mayoría de las 77 clases tienen F1-scores entre 0.80 y 1.00. Las clases con mejor desempeño (~0.99 F1) incluyen `age_limit`, `apple_pay_or_google_pay`, `contactless_not_working`, `activate_my_card`, `atm_support`, `automatic_top_up`, `card_about_to_expire`, `change_pin`, `compromised_card`, `supported_cards_and_currencies`. Estas categorías tienen vocabulario muy distintivo y poco solapamiento con otras.
 
@@ -297,24 +299,25 @@ La inclusión de Sentence-BERT como tercera representación permite evaluar si l
 - Cada categoría tiene un perfil léxico distintivo, confirmado por nubes de palabras y el alto rendimiento de los clasificadores.
 
 ### Sobre las representaciones vectoriales
+- **Sentence Embeddings es la representación superior**: LR + Embeddings logra F1=0.9423 (+3.5pp sobre TF-IDF) con entrenamiento más rápido (1.7s vs 5.7s). La semántica contextual de Sentence-BERT captura relaciones que BoW/TF-IDF no pueden representar.
 - **TF-IDF supera consistentemente a BoW** para LR (+4.5pp F1), NB (+4.6pp) y RF (+4.9pp). La ponderación por importancia relativa es crítica con 77 clases que comparten vocabulario base.
-- **Sentence Embeddings** (384 dims) ofrecen semántica contextual y menor dimensionalidad, potencialmente mejorando la generalización sobre variaciones léxicas que BoW/TF-IDF no capturan.
 - Las matrices dispersas (`csr_matrix`) mantienen el uso de memoria en ~2-3 MB para BoW/TF-IDF. Embeddings ocupan ~27 MB (denso float32).
 - El vocabulario de 2,471 términos demuestra que `max_features=3000` fue un límite superior adecuado.
 
 ### Sobre los modelos
-- **Logistic Regression + TF-IDF es el claro ganador**: F1 0.9071, Accuracy 0.9068, entrenamiento en 5.7 segundos. Mejor relación accuracy/velocidad/interpretabilidad.
-- **Multinomial NB + TF-IDF es el segundo mejor**: F1 0.8869 en solo 2.3 segundos. Ideal para iteración rápida o entornos con recursos limitados.
-- **Random Forest + TF-IDF** rinde bien (F1 0.8950) pero es 6× más lento que LR sin ganancia de accuracy.
+- **Logistic Regression + Embeddings es el claro ganador**: F1 0.9423, Accuracy 0.9405, entrenamiento en 1.7 segundos. Mejor relación accuracy/velocidad gracias a Sentence-BERT.
+- **Logistic Regression + TF-IDF** es la mejor alternativa con interpretabilidad total: F1 0.9071 en 5.7s, coeficientes auditables por clase.
+- **Naive Bayes + TF-IDF** ofrece F1 0.8869 en solo 2.3 segundos. Ideal para iteración rápida o entornos con recursos limitados.
+- **Random Forest + Embeddings** (F1 0.9198) se beneficia de la dimensionalidad reducida, mejorando respecto a TF-IDF.
 
 ### Recomendación para producción
-**Logistic Regression + TF-IDF** con C=10. Ofrece:
-- **Accuracy**: 90.7% sobre 77 clases balanceadas.
-- **Velocidad**: 5.7s de entrenamiento, inferencia instantánea.
-- **Interpretabilidad**: Los coeficientes por clase indican exactamente qué palabras impulsan cada predicción.
-- **Simplicidad operativa**: Un único modelo lineal, fácil de serializar y desplegar.
+**Logistic Regression + Embeddings** con C=10. Ofrece:
+- **Accuracy**: 94.1% sobre 77 clases balanceadas.
+- **Velocidad**: 1.7s de entrenamiento, inferencia instantánea.
+- **Semántica contextual**: Sentence-BERT captura relaciones que enfoques léxicos no pueden.
+- **Dimensionalidad reducida**: 384 dims vs 2,471 de TF-IDF.
 
-Si la velocidad de iteración es prioritaria (ej. experimentación frecuente), **Multinomial NB + TF-IDF** ofrece 88.7% F1 en 2.3s, siendo un excelente baseline rápido.
+Como alternativa con total interpretabilidad, **Logistic Regression + TF-IDF** ofrece 90.7% F1 en 5.7s con coeficientes auditables por clase. Si la velocidad de iteración es prioritaria, **Naive Bayes + TF-IDF** ofrece 88.7% F1 en 2.3s.
 
 ---
 
