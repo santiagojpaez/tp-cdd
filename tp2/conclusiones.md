@@ -5,9 +5,9 @@ Se desarrolló un pipeline completo de NLP para clasificación de intenciones (*
 
 ### Pipeline implementado
 1. **EDA:** Distribución de categorías (77 clases, 75-227 muestras), análisis de longitud de textos (mediana 10 palabras), nubes de palabras y frecuencias léxicas (68,055 tokens post-limpieza).
-2. **Preprocesamiento:** Limpieza de texto (lowercase, sin puntuación ni stopwords), LabelEncoder para 77 clases, vectorización BoW y TF-IDF con max_features=3000 (vocabulario real: 2,471 términos, matriz dispersa).
-3. **Balanceo:** SMOTE con k_neighbors=4, pasando de 13,083 a 17,479 muestras (227 por clase).
-4. **Modelado:** 4 modelos (LR, MultinomialNB, Random Forest, Gradient Boosting) × 2 representaciones, GridSearchCV con 3-fold CV estratificado.
+2. **Preprocesamiento:** Limpieza de texto (lowercase, sin puntuación ni stopwords), LabelEncoder para 77 clases, vectorización BoW/TF-IDF (2,471 términos, matriz dispersa) + Sentence Embeddings (Sentence-BERT, 384 dims).
+3. **Balanceo:** SMOTE con k_neighbors=4, pasando de 13,083 a 17,479 muestras por representación (227 por clase).
+4. **Modelado:** 3 modelos (LR, NB, Random Forest) × 3 representaciones, GridSearchCV con 3-fold CV estratificado.
 
 ## Resultados obtenidos
 
@@ -17,25 +17,23 @@ Se desarrolló un pipeline completo de NLP para clasificación de intenciones (*
 | Random Forest | TF-IDF | 0.8955 | 0.8950 | 35.5 |
 | Multinomial NB | TF-IDF | 0.8873 | 0.8869 | 2.3 |
 | Logistic Regression | BoW | 0.8604 | 0.8616 | 11.4 |
-| Gradient Boosting | BoW | 0.8377 | 0.8381 | 554.7 |
-| Gradient Boosting | TF-IDF | 0.8196 | 0.8240 | 881.2 |
+
+*Los resultados con Sentence Embeddings se completan al ejecutar el notebook completo con las 3 representaciones.*
 
 ### Hallazgos principales
 - **Logistic Regression + TF-IDF es el mejor modelo** en accuracy, F1 y eficiencia (5.7s de entrenamiento). La regularización L2 con C=10 controla eficazmente el sobreajuste en el espacio de 2,471 dimensiones.
-- **TF-IDF supera a BoW en LR, NB y RF** (+4-5 puntos de F1 en cada caso). La excepción es Gradient Boosting, donde TF-IDF empeora el rendimiento (0.824 vs 0.838).
-- **Gradient Boosting decepciona:** es 100× más lento que LR y tiene el peor rendimiento global. La naturaleza secuencial del algoritmo y el sobreajuste en espacios de alta dimensionalidad con features TF-IDF explican este resultado.
+- **TF-IDF supera a BoW en LR, NB y RF** (+4-5 puntos de F1 en cada caso).
 - **Multinomial NB es el más rápido** (2.3s) con rendimiento competitivo (F1 0.8869), excelente como baseline para iteración rápida.
 - **SMOTE funciona correctamente:** la diferencia entre F1 weighted y macro es <0.001 en todos los modelos, confirmando que ninguna clase está siendo sistemáticamente perjudicada.
 
 ## Evaluación del cumplimiento del TP
 - **Inciso 1 (EDA):** Cumplido. Distribuciones, medidas estadísticas, gráficos de barras, histogramas, nubes de palabras.
 - **Inciso 2 (Preprocesamiento):** Cumplido. Limpieza de texto, codificación, BoW/TF-IDF, balanceo con SMOTE.
-- **Inciso 3 (Modelado):** Cumplido. 4 modelos con GridSearchCV, división train/test estratificada, métricas completas (accuracy, precision, recall, F1 weighted/macro, classification report por clase).
+- **Inciso 3 (Modelado):** Cumplido. 3 modelos con GridSearchCV, división train/test estratificada, métricas completas (accuracy, precision, recall, F1 weighted/macro, classification report por clase).
 
 ## Lecciones aprendidas
 - En clasificación de texto con features dispersas y clases balanceadas, un modelo lineal bien regularizado puede superar a ensembles complejos.
 - La representación vectorial (TF-IDF vs BoW) impacta más que la elección del modelo: la ganancia de pasar de BoW a TF-IDF (+4.5pp F1) es mayor que la diferencia entre el mejor y el peor modelo con la misma representación.
-- No todos los modelos avanzados son adecuados para todos los problemas: Gradient Boosting, excelente en datos tabulares densos, no es la herramienta correcta para features dispersas de NLP con 77 clases.
 - Las matrices dispersas (`csr_matrix`) son esenciales para NLP: reducen el uso de memoria de ~266 MB a ~2-3 MB sin pérdida de información.
 
 ## Recomendación

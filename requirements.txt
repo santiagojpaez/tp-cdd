@@ -11,3 +11,4 @@ pickle
 psutil
 wordcloud
 nltk
+sentence_transformers

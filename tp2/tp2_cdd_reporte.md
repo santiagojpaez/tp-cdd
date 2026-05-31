@@ -29,8 +29,7 @@
 6. [Fase 5 — Notas finales y fundamentación de decisiones](#6-fase-5--notas-finales-y-fundamentación-de-decisiones)
    - [6.1 ¿Por qué TF-IDF supera a BoW?](#61-por-qué-tf-idf-supera-a-bow)
    - [6.2 ¿Por qué Logistic Regression supera a los ensembles?](#62-por-qué-logistic-regression-supera-a-los-ensembles)
-   - [6.3 Rendimiento de Gradient Boosting: análisis del caso](#63-rendimiento-de-gradient-boosting-análisis-del-caso)
-   - [6.4 Estrategia de balanceo con SMOTE](#64-estrategia-de-balanceo-con-smote)
+   - [6.3 Estrategia de balanceo con SMOTE](#63-estrategia-de-balanceo-con-smote)
 7. [Conclusiones y recomendaciones](#7-conclusiones-y-recomendaciones)
 
 ---
@@ -41,7 +40,7 @@ El presente documento constituye un reporte técnico detallado del trabajo de an
 
 El dataset utilizado es una versión adaptada del conjunto de datos propuesto por Casanueva et al. (2020) en el paper *Efficient Intent Detection with Dual Sentence Encoders*. Contiene **13,083 mensajes** etiquetados en **77 categorías de intención** distintas, abarcando dominios como consultas bancarias, tarjetas de crédito, transferencias y servicios al cliente.
 
-El notebook se articula en tres partes técnicas principales. La **Parte 1** comprende el Análisis Exploratorio de Datos (EDA), donde se examina la distribución de categorías, las características de los textos y los patrones léxicos. La **Parte 2** abarca el preprocesamiento completo: limpieza de texto, codificación de la variable objetivo, generación de representaciones vectoriales (Bag of Words y TF-IDF), balanceo de clases con SMOTE y división entrenamiento/prueba. La **Parte 3** implementa el entrenamiento de cuatro modelos de clasificación con búsqueda de hiperparámetros mediante GridSearchCV y validación cruzada estratificada de 3 folds, seguido de una evaluación comparativa exhaustiva.
+El notebook se articula en tres partes técnicas principales. La **Parte 1** comprende el Análisis Exploratorio de Datos (EDA), donde se examina la distribución de categorías, las características de los textos y los patrones léxicos. La **Parte 2** abarca el preprocesamiento completo: limpieza de texto, codificación de la variable objetivo, generación de representaciones vectoriales (Bag of Words y TF-IDF), balanceo de clases con SMOTE y división entrenamiento/prueba. La **Parte 3** implementa el entrenamiento de tres modelos de clasificación con búsqueda de hiperparámetros mediante GridSearchCV y validación cruzada estratificada de 3 folds, seguido de una evaluación comparativa exhaustiva.
 
 El stack tecnológico incluye `pandas`, `numpy`, `matplotlib` y `seaborn` para análisis y visualización; `scikit-learn` para vectorización, modelado y evaluación; `imbalanced-learn` para balanceo con SMOTE; y `nltk` con `wordcloud` para el análisis léxico.
 
@@ -122,28 +121,42 @@ La función `clean_text()` aplica transformaciones estándar de preprocesamiento
 
 Las 77 categorías de intención se codifican numéricamente mediante `LabelEncoder` de scikit-learn, asignando un entero único (0–76) a cada categoría.
 
-### 4.3 Representaciones vectoriales: BoW y TF-IDF
+### 4.3 Representaciones vectoriales
 
-Se implementan dos representaciones vectoriales complementarias, ambas con `max_features=3000`. El vocabulario real resultante fue de **2,471 términos** para ambas representaciones, ya que tras la limpieza de texto el número de tokens únicos con frecuencia suficiente es menor al límite configurado.
+Se implementan tres representaciones: dos basadas en frecuencia (BoW y TF-IDF) y una basada en transformers (Sentence Embeddings).
 
-**Bag of Words (CountVectorizer)**:
+#### 4.3.1 Bag of Words (CountVectorizer)
+
 - Representa cada documento como un vector de frecuencias absolutas de términos.
-- Shape resultante: (13083, 2471).
+- `max_features=3000`. Vocabulario real: **2,471 términos**.
+- Shape resultante: (13083, 2471), matriz dispersa `csr_matrix`.
 
-**TF-IDF (TfidfVectorizer)**:
-- Pondera cada término por su frecuencia en el documento (TF) y su rareza en el corpus (IDF).
-- Shape resultante: (13083, 2471).
-- Los términos con mayor IDF (más discriminativos) incluyen: *topup*, *dormant*, *virtual*, *beneficiary*, *cheque*, *expire*, *fiat*, *cryptocurrency*, *verification*, *refund*, *fee*, *pin*. Son palabras muy específicas de categorías particulares.
-- La representación se mantiene como matriz dispersa (`csr_matrix`) para eficiencia de memoria: ~2-3 MB vs ~266 MB si fuera densa.
+#### 4.3.2 TF-IDF (TfidfVectorizer)
+
+- Pondera cada término por su frecuencia (TF) y su rareza en el corpus (IDF).
+- Shape resultante: (13083, 2471), matriz dispersa `csr_matrix`.
+- Términos con mayor IDF: *topup*, *dormant*, *virtual*, *beneficiary*, *cheque*, *expire*, *fiat*, *cryptocurrency*, *verification*, *refund*, *fee*, *pin*.
+- La matriz dispersa mantiene el uso de memoria en ~2-3 MB vs ~266 MB si fuera densa.
+
+#### 4.3.3 Sentence Embeddings (Sentence-BERT)
+
+Como representación adicional moderna, se utiliza **Sentence-BERT** con el modelo `all-MiniLM-L6-v2`:
+
+- Genera **embeddings densos de 384 dimensiones** (dense, float32).
+- Captura semántica contextual: frases como "can't access my account" y "unable to log in" producen vectores cercanos aunque no compartan vocabulario.
+- Limpieza más ligera que BoW/TF-IDF: solo lowercase y remoción de puntuación, preservando stopwords que aportan estructura sintáctica al transformer.
+- Shape resultante: (13083, 384).
+- **Nota:** Por ser valores continuos con negativos, se usa `GaussianNB` en lugar de `MultinomialNB` para Naive Bayes.
 
 ### 4.4 Balanceo del conjunto de datos con SMOTE
 
 Dado el desbalance moderado entre las 77 clases, se aplica **SMOTE (Synthetic Minority Oversampling Technique)** con `k_neighbors=4`. Este parámetro se elige para garantizar compatibilidad con la clase minoritaria (75 muestras).
 
-Resultado post-SMOTE:
+Resultado post-SMOTE (para cada representación):
 - **Antes**: 13,083 muestras, distribución de 75 a 227 por clase.
 - **Después**: 17,479 muestras, exactamente 227 por cada una de las 77 clases.
 - Incremento del 33.6% en el tamaño del dataset.
+- SMOTE se aplica por separado a BoW, TF-IDF y Embeddings, generando conjuntos balanceados independientes para cada representación.
 
 ### 4.5 División entrenamiento/prueba
 
@@ -158,16 +171,16 @@ El dataset balanceado se divide en entrenamiento (70%) y prueba (30%) mediante `
 
 ### 5.1 Modelos entrenados y búsqueda de hiperparámetros
 
-Se entrenan y optimizan cuatro modelos con `GridSearchCV` utilizando validación cruzada estratificada de 3 folds y `f1_weighted` como métrica de optimización.
+Se entrenan y optimizan tres modelos con `GridSearchCV` utilizando validación cruzada estratificada de 3 folds y `f1_weighted` como métrica de optimización.
 
 | # | Modelo | Hiperparámetros explorados | Combinaciones |
 |---|--------|---------------------------|:---:|
 | 1 | **Regresión Logística** | `C` ∈ {0.1, 1, 10}, `solver='lbfgs'` | 3 |
-| 2 | **Naive Bayes Multinomial** | `alpha` ∈ {0.01, 0.1, 0.5, 1.0} | 4 |
+| 2 | **Naive Bayes** | MultinomialNB: `alpha` ∈ {0.01, 0.1, 0.5, 1.0} / GaussianNB: `var_smoothing` ∈ {1e-12, 1e-9, 1e-6} | 4 / 3 |
 | 3 | **Random Forest** | `n_estimators` ∈ {100, 200}, `max_depth` ∈ {30, None}, `min_samples_split` ∈ {2, 5} | 8 |
-| 4 | **Gradient Boosting** | `n_estimators` ∈ {100, 200}, `max_depth` ∈ {3, 5}, `learning_rate=0.1` | 4 |
 
-La búsqueda se realiza sobre ambas representaciones vectoriales (BoW y TF-IDF), resultando en 2 × (3+4+8+4) = 38 combinaciones de modelo × vectorización, evaluadas cada una con 3-fold CV.
+
+La búsqueda se realiza sobre las tres representaciones (BoW, TF-IDF, Embeddings), resultando en 3 × (3+4+8) = 45 combinaciones de modelo × vectorización, cada una con 3-fold CV. Para embeddings se usa `GaussianNB` (en lugar de `MultinomialNB`) porque los vectores contienen valores negativos.
 
 ### 5.2 Métricas de evaluación
 
@@ -186,11 +199,14 @@ Dado que el problema tiene 77 clases balanceadas post-SMOTE, se utilizan:
 | Logistic Regression | BoW | 0.8604 | 0.8616 | 0.8615 | 11.4 |
 | Multinomial NB | BoW | 0.8410 | 0.8407 | 0.8406 | **1.6** |
 | Random Forest | BoW | 0.8448 | 0.8456 | 0.8456 | 26.5 |
-| Gradient Boosting | BoW | 0.8377 | 0.8381 | 0.8381 | 554.7 |
 | **Logistic Regression** | **TF-IDF** | **0.9068** | **0.9071** | **0.9070** | **5.7** |
 | Multinomial NB | TF-IDF | 0.8873 | 0.8869 | 0.8868 | 2.3 |
 | Random Forest | TF-IDF | 0.8955 | 0.8950 | 0.8949 | 35.5 |
-| Gradient Boosting | TF-IDF | 0.8196 | 0.8240 | 0.8239 | 881.2 |
+| Logistic Regression | Embeddings | — | — | — | — |
+| Gaussian NB | Embeddings | — | — | — | — |
+| Random Forest | Embeddings | — | — | — | — |
+
+*(Los resultados de embeddings se completan al ejecutar el notebook completo.)*
 
 **Mejores hiperparámetros encontrados:**
 
@@ -199,7 +215,6 @@ Dado que el problema tiene 77 clases balanceadas post-SMOTE, se utilizan:
 | Logistic Regression | TF-IDF | C = 10, solver = lbfgs |
 | Multinomial NB | TF-IDF | alpha = 0.1 |
 | Random Forest | TF-IDF | n_estimators = 200, max_depth = None, min_samples_split = 2 |
-| Gradient Boosting | TF-IDF | n_estimators = 200, learning_rate = 0.1, max_depth = 5 |
 
 ### 5.4 Análisis comparativo del rendimiento
 
@@ -213,15 +228,10 @@ El ranking final, ordenado por F1-score weighted, es:
 
 4. **Regresión Logística + BoW**: F1 = 0.8616, Tiempo = 11.4s. El drop de ~4.5 puntos de F1 respecto a TF-IDF muestra el valor de la ponderación por importancia relativa.
 
-5. **Gradient Boosting + BoW**: F1 = 0.8381, Tiempo = 554.7s (~9 min). Rendimiento inferior y costo computacional muy elevado.
-
-6. **Gradient Boosting + TF-IDF**: F1 = 0.8240, Tiempo = 881.2s (~15 min). Es el peor modelo, y contradictoriamente rinde **peor que con BoW**. Ver sección 6.3 para el análisis detallado.
-
 **Hallazgos clave:**
 
-- **TF-IDF supera a BoW en todos los modelos excepto Gradient Boosting**, donde ocurre lo contrario (0.824 vs 0.838). La ganancia es particularmente notable en LR (+4.5 puntos de F1) y NB (+4.6 puntos).
+- **TF-IDF supera a BoW en todos los modelos**. La ganancia es particularmente notable en LR (+4.5 puntos de F1) y NB (+4.6 puntos).
 - **Logistic Regression es el mejor modelo global**, contradiciendo la expectativa habitual de que los ensembles dominan. En un espacio de features dispersas de alta dimensionalidad con clases bien balanceadas, un modelo lineal bien regularizado puede ser óptimo.
-- **Gradient Boosting decepciona**: es el más lento (~9-15 min) y el de peor rendimiento. Con TF-IDF su F1 cae a 0.82, sugiriendo sobreajuste severo.
 - **Naive Bayes es el más rápido** (1.6-2.3s) con rendimiento competitivo, confirmando su utilidad como baseline y para iteración rápida.
 - **La diferencia F1 weighted vs macro es mínima** en todos los modelos (<0.001), indicando que SMOTE logró un balanceo efectivo y que ningún modelo está sesgando sus predicciones hacia clases específicas.
 
@@ -241,11 +251,9 @@ TF-IDF pondera cada término por su importancia relativa: penaliza palabras frec
 
 El análisis de los términos con mayor IDF confirma esta hipótesis: palabras como *topup*, *cryptocurrency*, *beneficiary*, *cheque*, *dormant*, *virtual*, *fiat* son extremadamente específicas de ciertas categorías y reciben pesos altos en TF-IDF, mientras que palabras ubicuas como *card* reciben pesos bajos. Esto permite que incluso modelos lineales como Logistic Regression aprendan fronteras de decisión efectivas.
 
-La excepción es Gradient Boosting, donde TF-IDF empeora el rendimiento (ver 6.3).
-
 ### 6.2 ¿Por qué Logistic Regression supera a los ensembles?
 
-Este resultado —LR superando a Random Forest y Gradient Boosting— puede parecer contraintuitivo, pero tiene explicaciones sólidas:
+Este resultado —LR superando a Random Forest— puede parecer contraintuitivo, pero tiene explicaciones sólidas:
 
 1. **Alta dimensionalidad + muestra moderada**: Con 2,471 features y 12,235 muestras de entrenamiento, el ratio features/muestras (~0.2) es manejable para un modelo lineal regularizado. Los ensembles basados en árboles, en cambio, tienden a sobreajustar en espacios de alta dimensionalidad si no se restringe agresivamente la profundidad.
 
@@ -255,18 +263,7 @@ Este resultado —LR superando a Random Forest y Gradient Boosting— puede pare
 
 4. **Balanceo perfecto post-SMOTE**: Con clases perfectamente balanceadas, LR no sufre el sesgo hacia clases mayoritarias que a veces favorece a los ensembles.
 
-### 6.3 Rendimiento de Gradient Boosting: análisis del caso
-
-Gradient Boosting presenta el caso más llamativo: es el modelo más lento y el de peor rendimiento, y con TF-IDF rinde **peor** que con BoW (0.824 vs 0.838).
-
-Posibles causas:
-1. **Sobreajuste secuencial**: GB construye árboles para corregir errores residuales. En un espacio de 2,471 features con 77 clases, los primeros árboles capturan las separaciones más obvias, pero los árboles posteriores (hasta 200) terminan modelando ruido. El hecho de que `max_depth=5` sea el óptimo en TF-IDF (vs `max_depth=3` en BoW) sugiere que GB necesita árboles más profundos para capturar señal en TF-IDF, lo que incrementa el riesgo de sobreajuste.
-2. **Features TF-IDF no son óptimas para árboles**: Los árboles de decisión dividen basándose en umbrales de features individuales. Las features TF-IDF son valores continuos en [0,1], y las divisiones óptimas pueden requerir explorar muchos puntos de corte. BoW, con valores enteros, puede ser más amigable para este mecanismo.
-3. **Costo computacional**: Con `n_estimators=200`, GB entrena 200 árboles secuencialmente (sin posibilidad de paralelización intra-fit), resultando en ~9-15 minutos incluso con solo 4 combinaciones de hiperparámetros.
-
-**Lección**: Para este dataset y representación, GB no es la herramienta adecuada. LR ofrece mejor accuracy en 1/150 del tiempo.
-
-### 6.4 Estrategia de balanceo con SMOTE
+### 6.3 Estrategia de balanceo con SMOTE
 
 Se eligió SMOTE con `k_neighbors=4` sobre otras alternativas porque:
 - **RandomUnderSampler** habría eliminado ~4,000 muestras (~30% del dataset), perdiendo información valiosa.
@@ -274,6 +271,21 @@ Se eligió SMOTE con `k_neighbors=4` sobre otras alternativas porque:
 - **class_weight='balanced'** es una alternativa válida pero no garantiza que el modelo vea suficientes ejemplos de clases minoritarias durante el entrenamiento.
 
 La cercanía entre F1 weighted y F1 macro (diferencia <0.001 en todos los modelos) valida que SMOTE logró un balanceo efectivo.
+
+### 6.4 Sentence Embeddings: ventajas esperadas y trade-offs
+
+La inclusión de Sentence-BERT como tercera representación permite evaluar si la semántica contextual ofrece ventajas sobre enfoques puramente léxicos (BoW/TF-IDF):
+
+**Ventajas esperadas:**
+- **Semántica contextual**: "can't access my account" y "unable to log in" producen vectores cercanos aunque no compartan vocabulario. Esto debería mejorar la clasificación de frases con variaciones léxicas.
+- **Dimensionalidad reducida**: 384 dimensiones vs 2,471 de BoW/TF-IDF, lo que acelera el entrenamiento de modelos complejos (especialmente RF) y reduce el riesgo de sobreajuste.
+- **Robustez a out-of-vocabulary**: El tokenizador de BERT maneja palabras no vistas mediante subword tokenization.
+
+**Desventajas:**
+- **Costo de generación**: ~20-30 segundos para generar embeddings de 13K textos (one-time cost).
+- **Dependencia externa**: El modelo `all-MiniLM-L6-v2` pesa ~80 MB.
+- **Interpretabilidad reducida**: A diferencia de TF-IDF, no se puede inspeccionar directamente qué palabras impulsan cada predicción.
+- **NB requiere adaptación**: Los embeddings tienen valores negativos, por lo que se debe usar `GaussianNB` en lugar de `MultinomialNB`.
 
 ---
 
@@ -286,14 +298,14 @@ La cercanía entre F1 weighted y F1 macro (diferencia <0.001 en todos los modelo
 
 ### Sobre las representaciones vectoriales
 - **TF-IDF supera consistentemente a BoW** para LR (+4.5pp F1), NB (+4.6pp) y RF (+4.9pp). La ponderación por importancia relativa es crítica con 77 clases que comparten vocabulario base.
-- Las matrices dispersas (`csr_matrix`) mantienen el uso de memoria en ~2-3 MB, viable para cualquier hardware.
+- **Sentence Embeddings** (384 dims) ofrecen semántica contextual y menor dimensionalidad, potencialmente mejorando la generalización sobre variaciones léxicas que BoW/TF-IDF no capturan.
+- Las matrices dispersas (`csr_matrix`) mantienen el uso de memoria en ~2-3 MB para BoW/TF-IDF. Embeddings ocupan ~27 MB (denso float32).
 - El vocabulario de 2,471 términos demuestra que `max_features=3000` fue un límite superior adecuado.
 
 ### Sobre los modelos
 - **Logistic Regression + TF-IDF es el claro ganador**: F1 0.9071, Accuracy 0.9068, entrenamiento en 5.7 segundos. Mejor relación accuracy/velocidad/interpretabilidad.
 - **Multinomial NB + TF-IDF es el segundo mejor**: F1 0.8869 en solo 2.3 segundos. Ideal para iteración rápida o entornos con recursos limitados.
 - **Random Forest + TF-IDF** rinde bien (F1 0.8950) pero es 6× más lento que LR sin ganancia de accuracy.
-- **Gradient Boosting no es recomendable** para este problema: es ~100× más lento que LR y tiene el peor rendimiento.
 
 ### Recomendación para producción
 **Logistic Regression + TF-IDF** con C=10. Ofrece:
