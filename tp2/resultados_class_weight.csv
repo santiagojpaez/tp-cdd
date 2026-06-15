@@ -1,0 +1,4 @@
+Modelo,Vectorización,Técnica,Accuracy,F1 (macro),F1 (weighted)
+Logistic Regression,TF-IDF,class_weight=balanced,0.868,0.8675,0.8685
+Logistic Regression,BoW,class_weight=balanced,0.8596,0.8592,0.8601
+Logistic Regression,Embeddings,class_weight=balanced,0.9289,0.9301,0.9292
